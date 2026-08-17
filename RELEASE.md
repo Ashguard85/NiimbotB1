@@ -1,11 +1,15 @@
-# Release v6
+# Release v7
 
-Kompatibel mit Docker v6.
+Kompatibel mit Docker v7.
 
-## Änderungen v6
-- QuickChart-Import für Bluefy/iOS gehärtet: vollständige QuickChart-URL, URL ohne `https://` und reiner Query-Text wie `text=...&size=...&caption=...&captionFontSize=...` werden erkannt.
-- Erkennung zusätzlich über `input`, da Bluefy/iOS beim Einfügen nicht immer zuverlässig `paste` meldet.
-- `caption` wird sofort in „Text unter QR“ übernommen und neu gerendert.
-- Vorschau hält das reale Seitenverhältnis: 40×40 ist sichtbar quadratisch, 50×30 entsprechend rechteckig.
-- Service-Worker-Cache `qr-label-pwa-v6`, Assets mit `?v=6`.
-- 40×40 mm bleibt Standard; PDF übernimmt aktive Labelgröße und Caption.
+## Änderungen v7
+
+- Zwei Renderwege: **QuickChart API** und **Offline lokal**.
+- Beim Einfügen eines QuickChart-QR-Links wird automatisch der QuickChart-API-Modus gewählt.
+- QuickChart rendert das Originalbild inklusive `caption`, `captionFontSize`, `margin`, Fehlerkorrektur und unterstützten Stilparametern; das fertige Bild wird auf das aktuelle Label skaliert.
+- Bei Netzwerk-/CORS-/Timeout-Fehlern fällt die App automatisch auf den lokalen Renderer zurück.
+- Lokaler Renderer positioniert die Caption deutlich näher am QR-Code und bleibt vollständig offline nutzbar.
+- Drucken, PNG und PDF warten auf den aktuellen Renderer und verwenden exakt die sichtbare Vorschau.
+- QuickChart-Requests haben Timeout und einen kleinen In-Memory-Cache, um unnötige Wiederholungen zu vermeiden.
+- Service-Worker-Cache `qr-label-pwa-v7`, lokale Assets mit `?v=7`.
+- 40×40 mm bleibt Standard.

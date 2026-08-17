@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "6";
+  const APP_VERSION = "7";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -13,7 +13,10 @@
   let shortcutAutoprint = false;
   let shortcutNotice = "";
   let quickChartReferenceSize = 0;
+  let quickChartTemplateParams = null;
   let quickChartDetectTimer;
+  let renderGeneration = 0;
+  let quickChartCache = {url:"", blob:null};
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
@@ -68,14 +71,127 @@
 
   function captionFontPx(canvas, caption) {
     const pct = Math.max(0, Math.min(25, Number(els.captionScale.value) || 0));
-    let fs = pct > 0 ? Math.round(canvas.width * pct / 100) : Math.max(15, Math.floor(canvas.height * 0.085));
+    let fs = pct > 0 ? Math.round(canvas.width * pct / 100) : Math.max(15, Math.floor(canvas.width * 0.08));
     fs = Math.max(10, Math.min(Math.round(canvas.height*0.22), fs));
     return fs;
   }
 
+  function activeRenderMode() {
+    const selected = els.renderMode?.value || "auto";
+    if (selected === "local") return "local";
+    if (selected === "quickchart") return navigator.onLine ? "quickchart" : "local";
+    return quickChartTemplateParams && navigator.onLine ? "quickchart" : "local";
+  }
+
+  function buildQuickChartUrl() {
+    const text = els.qrText.value.trim();
+    if (!text) throw new Error("QR-Inhalt fehlt.");
+    const refSize = Math.max(150, Math.round(quickChartReferenceSize || 500));
+    const p = new URLSearchParams();
+    if (quickChartTemplateParams) {
+      const keep = ["margin","dark","light","finderColor","dotStyle","finderStyle","finderDotStyle","captionFontFamily","captionFontColor"];
+      for (const key of keep) {
+        const v = quickChartTemplateParams.get(key);
+        if (v !== null && v !== "") p.set(key, v);
+      }
+    }
+    p.set("text", text);
+    p.set("size", String(refSize));
+    p.set("ecLevel", els.ecc.value);
+    p.set("format", "png");
+    const caption = els.caption.value.trim();
+    if (caption) {
+      p.set("caption", caption);
+      const pct = Number(els.captionScale.value) || 0;
+      let fontSize = pct > 0 ? Math.round(refSize * pct / 100) : Number.parseFloat(quickChartTemplateParams?.get("captionFontSize") || "");
+      if (!Number.isFinite(fontSize) || fontSize <= 0) fontSize = Math.max(10, Math.round(refSize * 0.08));
+      p.set("captionFontSize", String(fontSize));
+    }
+    return `https://quickchart.io/qr?${p.toString()}`;
+  }
+
+  async function loadQuickChartBitmap() {
+    const url = buildQuickChartUrl();
+    let blob = quickChartCache.url === url ? quickChartCache.blob : null;
+    if (!blob) {
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),8000);
+      let response;
+      try { response = await fetch(url, {method:"GET", mode:"cors", cache:"default", credentials:"omit", signal:controller.signal}); }
+      catch(e) { if(e.name==="AbortError") throw new Error("QuickChart Timeout"); throw e; }
+      finally { clearTimeout(timeout); }
+      if (!response.ok) throw new Error(`QuickChart HTTP ${response.status}`);
+      blob = await response.blob();
+      if (!blob.type.startsWith("image/")) throw new Error("QuickChart lieferte kein Bild.");
+      quickChartCache={url,blob};
+    }
+    if (window.createImageBitmap) return {image: await createImageBitmap(blob), url};
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const image = await new Promise((resolve,reject)=>{
+        const img=new Image(); img.onload=()=>resolve(img); img.onerror=()=>reject(new Error("QuickChart-Bild konnte nicht gelesen werden.")); img.src=objectUrl;
+      });
+      return {image, url};
+    } finally { setTimeout(()=>URL.revokeObjectURL(objectUrl),1000); }
+  }
+
+  function drawLocalLabel(ctx, c, text, caption) {
+    if (!window.qrcode) throw new Error("QR-Bibliothek nicht geladen.");
+    const qr = qrcode(0, els.ecc.value);
+    qr.addData(text, "Byte");
+    qr.make();
+    const n = qr.getModuleCount();
+    const margin = Math.max(6, Math.round(c.width * 0.025));
+    let fs = caption ? captionFontPx(c, caption) : 0;
+    const gap = caption ? Math.max(2, Math.round(fs * 0.18)) : 0;
+    const captionLineH = caption ? Math.ceil(fs * 1.08) : 0;
+    const maxQr = Math.min(c.width - margin*2, c.height - margin*2 - captionLineH - gap);
+    const modulePx = Math.max(1, Math.floor(maxQr / (n + 8)));
+    const qrPx = n * modulePx;
+    const quiet = 4 * modulePx;
+    const total = qrPx + quiet*2;
+    const x0 = Math.round((c.width-total)/2) + quiet;
+    const contentH = total + (caption ? gap + captionLineH : 0);
+    const top = Math.max(margin, Math.round((c.height-contentH)/2));
+    const y0 = top + quiet;
+
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle = "#000";
+    for (let r=0;r<n;r++) for (let col=0;col<n;col++) {
+      if (qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx, y0+r*modulePx, modulePx, modulePx);
+    }
+    if (caption) {
+      ctx.font = `700 ${fs}px Arial, Helvetica, sans-serif`;
+      while (fs > 10 && ctx.measureText(caption).width > c.width-margin*2) {
+        fs--; ctx.font = `700 ${fs}px Arial, Helvetica, sans-serif`;
+      }
+      const qrBottom = top + total;
+      const captionY = Math.min(c.height-margin-Math.ceil(fs*0.5), qrBottom + gap + Math.ceil(fs*0.55));
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle="#000";
+      ctx.fillText(caption, c.width/2, captionY);
+    }
+    return n;
+  }
+
+  async function drawQuickChartLabel(ctx, c) {
+    const {image} = await loadQuickChartBitmap();
+    try {
+      ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality="high";
+      const iw=image.width, ih=image.height;
+      const scale=Math.min(c.width/iw,c.height/ih);
+      const dw=Math.round(iw*scale), dh=Math.round(ih*scale);
+      const dx=Math.round((c.width-dw)/2), dy=Math.round((c.height-dh)/2);
+      ctx.drawImage(image,dx,dy,dw,dh);
+    } finally { if (typeof image.close === "function") image.close(); }
+  }
+
   function render(immediate=false) {
     clearTimeout(renderTimer);
-    const draw = () => {
+    const generation=++renderGeneration;
+    const draw = async () => {
       const p = printerGeometry();
       const c = els.labelCanvas;
       if (c.width !== p.size.w_px || c.height !== p.size.h_px) {
@@ -94,36 +210,15 @@
         return;
       }
       try {
-        if (!window.qrcode) throw new Error("QR-Bibliothek nicht geladen.");
-        const qr = qrcode(0, els.ecc.value);
-        qr.addData(text, "Byte");
-        qr.make();
-        const n = qr.getModuleCount();
-        const margin = Math.max(8, Math.round(c.width * 0.035));
-        let fs = caption ? captionFontPx(c, caption) : 0;
-        const captionH = caption ? Math.max(Math.round(c.height*0.15), Math.ceil(fs*1.45)+4) : 0;
-        const maxQr = Math.min(c.width - margin*2, c.height - margin*2 - captionH);
-        const modulePx = Math.max(1, Math.floor(maxQr / (n + 8)));
-        const qrPx = n * modulePx;
-        const quiet = 4 * modulePx;
-        const total = qrPx + quiet*2;
-        const x0 = Math.round((c.width-total)/2) + quiet;
-        const yArea = c.height - captionH;
-        const y0 = Math.round((yArea-total)/2) + quiet;
-
-        ctx.imageSmoothingEnabled = false;
-        ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height);
-        ctx.fillStyle = "#000";
-        for (let r=0;r<n;r++) for (let col=0;col<n;col++) {
-          if (qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx, y0+r*modulePx, modulePx, modulePx);
-        }
-        if (caption) {
-          ctx.font = `700 ${fs}px system-ui`;
-          while (fs > 10 && ctx.measureText(caption).width > c.width-margin*2) {
-            fs--; ctx.font = `700 ${fs}px system-ui`;
-          }
-          ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle="#000";
-          ctx.fillText(caption, c.width/2, c.height-captionH/2);
+        const mode=activeRenderMode();
+        if (mode === "quickchart") {
+          els.renderState.textContent="QuickChart …";
+          await drawQuickChartLabel(ctx,c);
+          if (generation !== renderGeneration) return;
+          els.renderState.textContent=`QuickChart API · ${utf8ByteLength(text)} B`;
+        } else {
+          const n=drawLocalLabel(ctx,c,text,caption);
+          els.renderState.textContent=`lokal · ${n}×${n} · ${utf8ByteLength(text)} B`;
         }
         if (els.invert.checked) {
           const img=ctx.getImageData(0,0,c.width,c.height);
@@ -132,15 +227,26 @@
           }
           ctx.putImageData(img,0,0);
         }
-        els.renderState.textContent = `${n}×${n} · ${utf8ByteLength(text)} B`;
         els.printBtn.disabled = !connected;
       } catch (e) {
+        if (generation !== renderGeneration) return;
+        if (activeRenderMode() === "quickchart") {
+          try {
+            const n=drawLocalLabel(ctx,c,text,caption);
+            els.renderState.textContent=`Offline-Fallback · ${n}×${n}`;
+            status("QuickChart nicht erreichbar oder im Browser blockiert. Lokaler Renderer wird als Fallback verwendet: "+e.message,"warn");
+            els.printBtn.disabled=!connected;
+            return;
+          } catch (_) {}
+        }
         drawPlaceholder(ctx,c.width,c.height);
         els.renderState.textContent = "Fehler";
         status("QR-Code konnte nicht erzeugt werden: " + e.message, "error");
       }
     };
-    if (immediate) draw(); else renderTimer = setTimeout(draw, 60);
+    if (immediate) return draw();
+    renderTimer = setTimeout(()=>{ void draw(); },60);
+    return Promise.resolve();
   }
 
   function quickChartParams(value) {
@@ -194,6 +300,11 @@
     if (parsed.ecLevel) els.ecc.value = parsed.ecLevel;
     if (parsed.captionPct !== null) els.captionScale.value = parsed.captionPct.toFixed(1).replace(/\.0$/,"");
     quickChartReferenceSize = Number.isFinite(parsed.refSize) ? parsed.refSize : 0;
+    quickChartTemplateParams = new URLSearchParams(quickChartParams(value));
+    if (els.renderMode) {
+      els.renderMode.value = "quickchart";
+      await LocalStore.setSetting("renderMode", "quickchart");
+    }
     await LocalStore.setSetting("draftQr", els.qrText.value);
     await LocalStore.setSetting("draftCaption", els.caption.value);
     await LocalStore.setSetting("captionScale", Number(els.captionScale.value)||0);
@@ -307,7 +418,7 @@
   }
 
   async function canvasBlob() {
-    render(true);
+    await render(true);
     return new Promise((resolve,reject)=>els.labelCanvas.toBlob(b=>b?resolve(b):reject(new Error("PNG konnte nicht erstellt werden.")),"image/png"));
   }
 
@@ -321,7 +432,6 @@
   }
 
   function pdfBlobFromCanvas() {
-    render(true);
     const c=els.labelCanvas;
     const ctx=c.getContext("2d",{alpha:false});
     const rgba=ctx.getImageData(0,0,c.width,c.height).data;
@@ -363,6 +473,7 @@
 
   async function savePdf() {
     try {
+      await render(true);
       const blob=pdfBlobFromCanvas();
       const name=`qr-label-${els.labelSize.value}.pdf`;
       const file=new File([blob],name,{type:"application/pdf"});
@@ -400,7 +511,7 @@
     if(!qr || !connected) return;
     try {
       dirty=true; els.printBtn.disabled=true; els.connectBtn.disabled=true;
-      render(true);
+      await render(true);
       status("Druckdaten werden übertragen …","info");
       const dataUrl=els.labelCanvas.toDataURL("image/png");
       await B1Printer.print(dataUrl,{
@@ -590,7 +701,7 @@
 
   async function init() {
     ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","labelSize","ecc","previewStage","labelCanvas","labelInfo","renderState",
-     "density","densityOut","copies","offsetY","captionScale","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
+     "density","densityOut","copies","offsetY","captionScale","renderMode","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     els.appVersion.textContent="v"+APP_VERSION;
@@ -599,6 +710,7 @@
     els.density.value=await LocalStore.getSetting("density",3); els.densityOut.value=els.density.value;
     els.copies.value=await LocalStore.getSetting("copies",1);
     els.captionScale.value=await LocalStore.getSetting("captionScale",0);
+    els.renderMode.value=await LocalStore.getSetting("renderMode","auto");
     const defaultSizeRevision=await LocalStore.getSetting("defaultLabelSizeRevision",0);
     let savedSize=await LocalStore.getSetting("labelSize","40x40");
     if (Number(defaultSizeRevision) < 5) {
@@ -625,6 +737,7 @@
     els.qrText.addEventListener("change",detectQuickChart);
     els.caption.addEventListener("input",()=>LocalStore.setSetting("draftCaption",els.caption.value));
     els.captionScale.addEventListener("change",()=>LocalStore.setSetting("captionScale",Number(els.captionScale.value)||0));
+    els.renderMode.addEventListener("change",()=>{ LocalStore.setSetting("renderMode",els.renderMode.value); dirty=true; render(true); });
     els.labelSize.addEventListener("change",()=>setLabelSize(els.labelSize.value,{persist:true,resetOffset:true}));
     els.density.addEventListener("input",()=>{ els.densityOut.value=els.density.value; LocalStore.setSetting("density",Number(els.density.value)); });
     els.copies.addEventListener("change",()=>LocalStore.setSetting("copies",Number(els.copies.value)));
@@ -645,7 +758,7 @@
     els.importFile.addEventListener("change",()=>{ const f=els.importFile.files?.[0]; if(f) importBackup(f).finally(()=>els.importFile.value=""); });
     els.updateBtn.addEventListener("click",applyUpdate);
 
-    const online=()=>{ els.onlineState.textContent=navigator.onLine?"online":"offline"; };
+    const online=()=>{ els.onlineState.textContent=navigator.onLine?"online":"offline"; render(true); };
     addEventListener("online",online); addEventListener("offline",online); online();
 
     const shortcutApplied = await applyShortcutParams({announce:false});

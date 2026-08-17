@@ -10,10 +10,10 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=6">
+  <link rel="manifest" href="./manifest.webmanifest?v=7">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=6">
+  <link rel="stylesheet" href="./app.css?v=7">
 </head>
 <body>
   <header class="topbar">
@@ -29,9 +29,9 @@
       <div class="section-head">
         <div>
           <h2 id="editorTitle">Label</h2>
-          <p>QR-Code lokal erzeugen und direkt per Bluetooth drucken.</p>
+          <p>QR-Code lokal oder über QuickChart erzeugen und direkt per Bluetooth drucken.</p>
         </div>
-        <span id="appVersion" class="version">v6</span>
+        <span id="appVersion" class="version">v7</span>
       </div>
 
       <label class="field">
@@ -114,6 +114,15 @@
             <span>Caption-Größe (%) <small>0 = Auto</small></span>
             <input id="captionScale" type="number" min="0" max="25" step="0.5" value="0" inputmode="decimal">
           </label>
+          <label class="field">
+            <span>Render-Modus</span>
+            <select id="renderMode">
+              <option value="auto">Auto · QuickChart wenn verfügbar</option>
+              <option value="quickchart">QuickChart API · originalgetreu</option>
+              <option value="local">Offline lokal · ohne Internet</option>
+            </select>
+            <small class="field-help">Bei einem QuickChart-Link wird automatisch die QuickChart API gewählt. Fällt sie aus, rendert die App lokal weiter.</small>
+          </label>
           <label class="switch-row">
             <input id="invert" type="checkbox">
             <span>Schwarz/Weiß invertieren</span>
@@ -178,7 +187,7 @@
           <div class="update-box">
             <div>
               <strong>App-Version</strong>
-              <div id="updateStatus">v6 · wird geprüft</div>
+              <div id="updateStatus">v7 · wird geprüft</div>
             </div>
             <button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button>
           </div>
@@ -209,7 +218,7 @@
   </main>
 
   <footer>
-    <span>QR Label v6</span>
+    <span>QR Label v7</span>
     <span id="onlineState">online</span>
   </footer>
 
@@ -218,9 +227,9 @@
   <!-- Pinned third-party libraries. The service worker caches these after a successful online load. -->
   <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
   <script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script>
-  <script src="./storage.js?v=6" defer></script>
-  <script src="./providers.js?v=6" defer></script>
-  <script src="./printer.js?v=6" defer></script>
-  <script src="./app.js?v=6" defer></script>
+  <script src="./storage.js?v=7" defer></script>
+  <script src="./providers.js?v=7" defer></script>
+  <script src="./printer.js?v=7" defer></script>
+  <script src="./app.js?v=7" defer></script>
 </body>
 </html>
