@@ -1,49 +1,49 @@
-# Apple Kurzbefehle / Shortcut-API – v3
+# Apple Kurzbefehle / URL-API – v4
 
-## Empfohlene URL
+## Direkter QR-Inhalt
 
-Die PWA übernimmt Parameter bevorzugt aus dem URL-Fragment. Beispiel:
+Bevorzugt als URL-Fragment:
 
 ```text
-https://USER.github.io/REPO/#qr=https%3A%2F%2Fexample.com%2Fkunde%2F123&text=Kunde%20123&copies=1&density=3&autoprint=1
+https://USER.github.io/REPO/#qr=https%3A%2F%2Fexample.com%2Fkunde%2F123&caption=IAM-43322&label=40x40&autoprint=1
 ```
 
-Parameter:
-
+Unterstützt:
 - `qr` – QR-Inhalt
-- `text` oder `caption` – Beschriftung
+- `caption` oder aus Kompatibilitätsgründen `text` – Beschriftung
+- `label` oder `size` – `50x30` oder `40x40`
 - `copies` – 1 bis 20
 - `density` – 1 bis 5
-- `offset` – -40 bis +40 Pixel
+- `offset` – -60 bis +60 Pixel
 - `ecc` – L, M, Q oder H
-- `size` – derzeit `50x30`
+- `captionpct` – Caption-Schriftgröße in Prozent der Labelbreite; `0` = Auto
 - `autoprint=1` – nach erfolgreicher Bluetooth-Auswahl direkt drucken
 
-`?qr=...` wird ebenfalls unterstützt. Für QR-Inhalte wird `#qr=...` bevorzugt, da der Fragmentinhalt nicht Teil des HTTP-Requests an den Webhost ist.
+## QuickChart-Link übergeben
 
-## Kurzbefehl auf iPhone/iPad
-
-Ein einfacher Kurzbefehl kann:
-
-1. die Eingabe/Adresse übernehmen,
-2. den Text URL-codieren,
-3. die PWA-URL mit `#qr=<codierter Inhalt>&autoprint=1` zusammensetzen,
-4. diese URL öffnen.
-
-Für den B1-Druck muss die Seite auf iOS in einem Web-Bluetooth-fähigen Browser wie Bluefy laufen. Das community-dokumentierte Bluefy-Schema lautet:
+Der vollständige QuickChart-Link wird URL-codiert in `quickchart=` oder `source=` übergeben:
 
 ```text
-bluefy://open?url=<VOLLSTÄNDIG-URL-CODIERTE-PWA-URL>
+https://USER.github.io/REPO/#quickchart=QUICKCHART_URL_ENCODED&label=40x40&autoprint=1
 ```
 
-Dieses Bluefy-Schema ist nicht in der öffentlichen App-Store-Beschreibung dokumentiert und sollte deshalb einmal auf deinem Gerät getestet werden. Falls es nicht funktioniert, die erzeugte PWA-URL manuell in Bluefy öffnen.
+Beispiel-QuickChart-Quelle:
+
+```text
+https://quickchart.io/qr?text=https%3A%2F%2Fsupport.braendi.ch%2Fsecure%2FShowObject.jspa%3Fid%3D43322&size=500&caption=IAM-43322&captionFontSize=40
+```
+
+Die Web-App liest den Link lokal aus. `text` wird zum QR-Inhalt, `caption` zur Beschriftung, `ecLevel` zur Fehlerkorrektur. Wenn sowohl `size` als auch `captionFontSize` vorhanden sind, wird deren Verhältnis als Caption-Größe übernommen. Das physische Label wird ausschließlich durch `label=50x30` bzw. `label=40x40` festgelegt.
+
+Sonderzeichen in der inneren `text=`-URL sollten wie von QuickChart empfohlen URL-codiert sein. Insbesondere bei inneren URLs mit eigenen `&`-Parametern ist Encoding nötig, damit QuickChart-Optionen und Ziel-URL eindeutig bleiben.
+
+## iPhone / iPad
+
+Für den direkten B1-Druck muss die Seite in einem Web-Bluetooth-fähigen Browser wie Bluefy laufen. Safari/Chrome auf iOS stellen Web Bluetooth nicht bereit. Ein offizielles, von Bluefy dokumentiertes Deep-Link-Schema wird in diesem Projekt nicht vorausgesetzt; die Druckseite kann dauerhaft als Tab/Favorit in Bluefy genutzt werden.
 
 ## Autoprint
 
-Browser dürfen die erstmalige Bluetooth-Geräteauswahl nicht ohne Benutzeraktion öffnen. Darum bedeutet `autoprint=1`:
-
-- Vorschau sofort erzeugen,
-- falls noch nicht verbunden: `B1 verbinden` antippen und B1 auswählen,
-- unmittelbar danach Druck automatisch starten.
-
-Wenn eine bereits laufende Seite eine neue Fragment-URL erhält und der B1 noch verbunden ist, startet `autoprint=1` ohne zusätzlichen Druck-Button.
+Browser dürfen die erstmalige Bluetooth-Geräteauswahl nicht ohne Benutzeraktion öffnen. `autoprint=1` bedeutet daher:
+1. Vorschau sofort erzeugen,
+2. `B1 verbinden` antippen und Drucker auswählen, falls noch nicht verbunden,
+3. direkt danach automatisch drucken.

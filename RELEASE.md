@@ -1,15 +1,18 @@
-# Release v3
+# Release v4
 
-Kompatibel mit Docker v3.
+Kompatibel mit Docker v4.
 
-## Änderungen
-- Shortcut-API aus v2 bleibt vollständig erhalten (`#qr=...`, `text`, `copies`, `density`, `offset`, `ecc`, `size`, `autoprint=1`).
-- ZIP-Importer schützt jetzt den gesamten Ordner `.github/workflows/`; automatische Imports ändern niemals Workflow-Dateien.
-- Zusätzlicher Safety-Check bricht ab, falls dennoch ein Workflow im Commit landen würde.
-- Alte Top-Level-Release-ZIPs werden nach erfolgreichem Import entfernt.
-- `workflow_dispatch` wird unterstützt.
-- `actions/checkout@v5` und `actions/upload-pages-artifact@v5` für aktuellen Node-24-kompatiblen Workflow-Pfad.
-- Service-Worker-Cache auf `qr-label-pwa-v3` erhöht.
+## Neu
+- Labelformate `50x30` und `40x40` auswählbar.
+- `50x30` nutzt die hardwarevalidierten Geometrien des NIIMBOT-Webtreibers: B1 `384×240`, B1 Pro `584×354`.
+- `40x40` nutzt abgeleitete Geometrien: B1 `320×320`, B1 Pro `472×472`; der Vertikal-Offset kann pro Gerät/Rolle feinjustiert werden.
+- Ein QuickChart-QR-Link kann direkt in das QR-Feld eingefügt werden. Die App übernimmt `text`, `caption`, `ecLevel` und das Verhältnis `captionFontSize / size` lokal, ohne das QuickChart-Bild laden zu müssen.
+- Das QuickChart-Feld `size` ist nur die Pixel-Referenz des QR-Bilds und ändert nicht das physische Labelformat.
+- Shortcut-API unterstützt zusätzlich `quickchart=`/`source=`, `label=40x40` und `captionpct=`.
+- Vorlagen und Druckhistorie speichern das Labelformat; Vorlagen speichern zusätzlich die Caption-Skalierung.
+- Backup-Format v2; Restore akzeptiert v1 und v2.
+- SQLite-Schema v2 migriert bestehende Daten automatisch um `label_size` und `caption_scale`.
+- Service-Worker-Cache `qr-label-pwa-v4`.
 
-## Einmalige Migration von v2-Repositorys
-Der v2-Importer schützt nur seine eigene Datei und kann sich deshalb absichtlich nicht selbst aktualisieren. In einem bereits bestehenden v2-Repository muss `.github/workflows/import-zip.yml` einmal manuell angepasst werden: beim `rsync` den Ausschluss auf `.github/workflows/` erweitern. Danach können zukünftige ZIP-Releases ohne Workflow-Schreibrechte importiert werden.
+## Hardware-Hinweis
+`40x40` ist in diesem Projekt eine berechnete Geometrie und wurde in dieser Umgebung nicht auf echter B1/B1-Pro-Hardware kalibriert. Vor produktiver Nutzung einen Testdruck machen und bei Bedarf den vertikalen Offset korrigieren.

@@ -1,5 +1,5 @@
 "use strict";
-const CACHE_VERSION = "qr-label-pwa-v3";
+const CACHE_VERSION = "qr-label-pwa-v4";
 const CACHE = CACHE_VERSION;
 const APP_SHELL = [
   "./","./index.html","./app.css","./app.js","./storage.js","./providers.js","./printer.js",

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const DB_NAME = "qr-label-v1";
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const SECRET_KEYS = new Set(["cfClientSecret", "cfClientId", "backendUrl"]);
 
   function openDb() {
@@ -102,13 +102,13 @@
       for (const row of settings) if (!SECRET_KEYS.has(row.key)) safeSettings[row.key] = row.value;
       return {
         format: "qr-label-backup",
-        version: 1,
+        version: 2,
         exported_at: new Date().toISOString(),
         data: { items, history, settings: safeSettings }
       };
     },
     async importData(payload, mode="merge") {
-      if (!payload || payload.format !== "qr-label-backup" || payload.version !== 1 || !payload.data) {
+      if (!payload || payload.format !== "qr-label-backup" || ![1,2].includes(Number(payload.version)) || !payload.data) {
         throw new Error("Ungültiges Backup-Format.");
       }
       const items = Array.isArray(payload.data.items) ? payload.data.items : [];

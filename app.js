@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "3";
+  const APP_VERSION = "4";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -12,9 +12,11 @@
   let renderTimer;
   let shortcutAutoprint = false;
   let shortcutNotice = "";
+  let quickChartReferenceSize = 0;
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
+  const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"50x30":1,"40x40":1}));
 
   function toast(msg) {
     els.toast.textContent = msg;
@@ -36,8 +38,18 @@
   }
 
   function printerGeometry() {
-    const p = activePrinter || B1Printer.current();
-    return p;
+    return activePrinter || B1Printer.current();
+  }
+
+  function updateGeometryUi({resetOffset=false}={}) {
+    const p = printerGeometry();
+    const size = p.size;
+    const validation = size.validated ? "kalibriert" : "abgeleitet";
+    els.labelInfo.textContent = `${p.name.replace("NIIMBOT ","")} · ${size.w_mm} × ${size.h_mm} mm · ${size.w_px} × ${size.h_px} px · ${validation}`;
+    if (resetOffset) {
+      els.offsetY.value = size.offset_y_px ?? 0;
+      LocalStore.setSetting("offsetY", Number(els.offsetY.value));
+    }
   }
 
   function utf8ByteLength(s) {
@@ -53,6 +65,13 @@
     ctx.fillText("QR-Inhalt eingeben", w/2, h/2);
   }
 
+  function captionFontPx(canvas, caption) {
+    const pct = Math.max(0, Math.min(25, Number(els.captionScale.value) || 0));
+    let fs = pct > 0 ? Math.round(canvas.width * pct / 100) : Math.max(15, Math.floor(canvas.height * 0.085));
+    fs = Math.max(10, Math.min(Math.round(canvas.height*0.22), fs));
+    return fs;
+  }
+
   function render(immediate=false) {
     clearTimeout(renderTimer);
     const draw = () => {
@@ -62,6 +81,7 @@
         c.width = p.size.w_px; c.height = p.size.h_px;
         c.style.aspectRatio = `${p.size.w_px} / ${p.size.h_px}`;
       }
+      updateGeometryUi();
       const ctx = c.getContext("2d", {alpha:false});
       const text = els.qrText.value.trim();
       const caption = els.caption.value.trim();
@@ -78,9 +98,10 @@
         qr.make();
         const n = qr.getModuleCount();
         const margin = Math.max(8, Math.round(c.width * 0.035));
-        const captionH = caption ? Math.max(32, Math.round(c.height*0.18)) : 0;
+        let fs = caption ? captionFontPx(c, caption) : 0;
+        const captionH = caption ? Math.max(Math.round(c.height*0.15), Math.ceil(fs*1.45)+4) : 0;
         const maxQr = Math.min(c.width - margin*2, c.height - margin*2 - captionH);
-        const modulePx = Math.max(1, Math.floor(maxQr / (n + 8))); // 4 module quiet zone each side
+        const modulePx = Math.max(1, Math.floor(maxQr / (n + 8)));
         const qrPx = n * modulePx;
         const quiet = 4 * modulePx;
         const total = qrPx + quiet*2;
@@ -95,8 +116,6 @@
           if (qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx, y0+r*modulePx, modulePx, modulePx);
         }
         if (caption) {
-          const maxFont = Math.max(15, Math.floor(c.height*0.085));
-          let fs = maxFont;
           ctx.font = `700 ${fs}px system-ui`;
           while (fs > 10 && ctx.measureText(caption).width > c.width-margin*2) {
             fs--; ctx.font = `700 ${fs}px system-ui`;
@@ -121,6 +140,53 @@
     };
     if (immediate) draw(); else renderTimer = setTimeout(draw, 60);
   }
+
+  function isQuickChartQrUrl(value) {
+    try {
+      const u = new URL(String(value).trim());
+      return /(^|\.)quickchart\.io$/i.test(u.hostname) && /^\/qr\/?$/i.test(u.pathname);
+    } catch (_) { return false; }
+  }
+
+  function parseQuickChart(value) {
+    if (!isQuickChartQrUrl(value)) return null;
+    const u = new URL(String(value).trim());
+    const p = u.searchParams;
+    const text = p.get("text");
+    if (!text) throw new Error("QuickChart-Link enthält keinen text=-Parameter.");
+    const caption = p.get("caption");
+    const ec = String(p.get("ecLevel") || p.get("ecc") || "").toUpperCase();
+    const refSize = Number.parseFloat(p.get("size") || "");
+    const fontSize = Number.parseFloat(p.get("captionFontSize") || "");
+    let captionPct = null;
+    if (Number.isFinite(refSize) && refSize > 0 && Number.isFinite(fontSize) && fontSize > 0) {
+      captionPct = Math.max(1, Math.min(25, (fontSize / refSize) * 100));
+    }
+    return { text, caption, ecLevel:["L","M","Q","H"].includes(ec) ? ec : null, refSize, fontSize, captionPct };
+  }
+
+  async function importQuickChartFromValue(value, {announce=true}={}) {
+    let parsed;
+    try { parsed = parseQuickChart(value); }
+    catch(e) { if(announce) status("QuickChart-Link konnte nicht übernommen werden: "+e.message,"error"); return false; }
+    if (!parsed) return false;
+    els.qrText.value = parsed.text;
+    if (parsed.caption !== null) els.caption.value = parsed.caption;
+    if (parsed.ecLevel) els.ecc.value = parsed.ecLevel;
+    if (parsed.captionPct !== null) els.captionScale.value = parsed.captionPct.toFixed(1).replace(/\.0$/,"");
+    quickChartReferenceSize = Number.isFinite(parsed.refSize) ? parsed.refSize : 0;
+    await LocalStore.setSetting("draftQr", els.qrText.value);
+    await LocalStore.setSetting("draftCaption", els.caption.value);
+    await LocalStore.setSetting("captionScale", Number(els.captionScale.value)||0);
+    render(true);
+    if (announce) {
+      const fontInfo = parsed.captionPct !== null ? ` · Caption ${els.captionScale.value}%` : "";
+      status(`QuickChart übernommen: QR-Ziel${parsed.caption!==null?" + Caption":""}${fontInfo}. Labelformat bleibt ${els.labelSize.value.replace("x","×")} mm.`,"ok");
+      toast("QuickChart übernommen");
+    }
+    return true;
+  }
+
   async function loadProvider() {
     mode = await LocalStore.getSetting("mode","local");
     document.querySelectorAll('input[name="mode"]').forEach(r=>r.checked=r.value===mode);
@@ -142,8 +208,7 @@
   async function refreshLists() {
     try {
       const [items,hist] = await Promise.all([provider.getItems(), provider.getHistory()]);
-      renderItems(items);
-      renderHistory(hist.slice(0,10));
+      renderItems(items); renderHistory(hist.slice(0,10));
     } catch(e) {
       renderItems([]); renderHistory([]);
       status(mode==="server" ? "Serverdaten konnten nicht geladen werden: "+e.message : "Lokale Daten konnten nicht geladen werden: "+e.message, "warn");
@@ -158,7 +223,7 @@
       const row=document.createElement("div"); row.className="list-item";
       const text=document.createElement("div");
       const strong=document.createElement("strong"); strong.textContent=item.name || "Vorlage";
-      const small=document.createElement("small"); small.textContent=item.qr_text || "";
+      const small=document.createElement("small"); small.textContent=`${item.label_size || "50x30"} · ${item.qr_text || ""}`;
       text.append(strong,small);
       const actions=document.createElement("div"); actions.className="mini-actions";
       const use=document.createElement("button"); use.className="mini"; use.type="button"; use.textContent="Laden";
@@ -178,11 +243,22 @@
       const row=document.createElement("div"); row.className="list-item";
       const text=document.createElement("div");
       const strong=document.createElement("strong");
-      strong.textContent = `${item.printer || "B1"} · ${item.copies || 1}×`;
+      strong.textContent = `${item.printer || "B1"} · ${(item.label_size || "50x30").replace("x","×")} · ${item.copies || 1}×`;
       const small=document.createElement("small");
       small.textContent = `${new Date(item.created_at).toLocaleString()} · ${item.qr_text || ""}`;
       text.append(strong,small); row.append(text); els.historyList.append(row);
     }
+  }
+
+  function setLabelSize(key, {persist=true, resetOffset=true}={}) {
+    if (!validLabelSizes.has(key)) key="50x30";
+    els.labelSize.value=key;
+    activePrinter=B1Printer.setSize(key);
+    if (persist) LocalStore.setSetting("labelSize",key);
+    updateGeometryUi({resetOffset});
+    render(true);
+    const g=printerGeometry().size;
+    if (!g.validated) status(`${g.w_mm}×${g.h_mm} mm ist für ${printerGeometry().name} abgeleitet. Bei Bedarf Vertikal-Offset nach Testdruck feinjustieren.`,"warn");
   }
 
   function applyItem(item) {
@@ -190,8 +266,10 @@
     els.caption.value=item.caption || "";
     els.ecc.value=item.ecc || "M";
     els.density.value=item.density || 3; els.densityOut.value=els.density.value;
+    els.captionScale.value = Number(item.caption_scale || 0);
+    setLabelSize(validLabelSizes.has(item.label_size) ? item.label_size : "50x30", {persist:true,resetOffset:false});
     els.offsetY.value = item.offset_y ?? printerGeometry().size.offset_y_px ?? 0;
-    render();
+    render(true);
   }
 
   async function savePreset() {
@@ -203,13 +281,14 @@
     const item={
       id:uuid(), name, qr_text:qr, caption:els.caption.value.trim(), ecc:els.ecc.value,
       density:Number(els.density.value), offset_y:Number(els.offsetY.value),
+      label_size:els.labelSize.value, caption_scale:Number(els.captionScale.value)||0,
       created_at:t, updated_at:t
     };
     await provider.createItem(item); await refreshLists(); toast("Vorlage gespeichert");
   }
 
-  function canvasDataUrl(){ render(true); return els.labelCanvas.toDataURL("image/png"); }
   async function canvasBlob() {
+    render(true);
     return new Promise((resolve,reject)=>els.labelCanvas.toBlob(b=>b?resolve(b):reject(new Error("PNG konnte nicht erstellt werden.")),"image/png"));
   }
 
@@ -217,13 +296,14 @@
     try {
       els.connectBtn.disabled=true; status("Bluetooth-Gerät auswählen …","info");
       activePrinter=await B1Printer.connect();
+      activePrinter=B1Printer.setSize(els.labelSize.value);
       setConnected(true, activePrinter.name.replace("NIIMBOT ","")+" verbunden");
-      els.labelInfo.textContent=`${activePrinter.name.replace("NIIMBOT ","")} · 50 × 30 mm · ${activePrinter.size.w_px} × ${activePrinter.size.h_px} px`;
-      els.offsetY.value=activePrinter.size.offset_y_px || 0;
-      render();
+      updateGeometryUi({resetOffset:false});
+      render(true);
       const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
-      const extra = ios && activePrinter.id===4096 ? " B1 + iOS/Bluefy ist in dieser v3 ein Hardware-Testpunkt." : "";
-      status(`${activePrinter.name} erkannt. Bereit zum Drucken.${extra}`,"ok");
+      const derived = !activePrinter.size.validated ? ` ${activePrinter.size.w_mm}×${activePrinter.size.h_mm} ist eine abgeleitete Geometrie; Offset bei Bedarf feinjustieren.` : "";
+      const extra = ios && activePrinter.id===4096 ? " B1 + iOS/Bluefy bleibt ein Hardware-Testpunkt." : "";
+      status(`${activePrinter.name} erkannt. Bereit zum Drucken.${derived}${extra}`, activePrinter.size.validated ? "ok" : "warn");
       if (shortcutAutoprint && els.qrText.value.trim()) {
         shortcutAutoprint = false;
         await printLabel();
@@ -243,14 +323,12 @@
       status("Druckdaten werden übertragen …","info");
       const dataUrl=els.labelCanvas.toDataURL("image/png");
       await B1Printer.print(dataUrl,{
-        density:Number(els.density.value),
-        copies:Number(els.copies.value),
-        offsetY:Number(els.offsetY.value),
+        density:Number(els.density.value), copies:Number(els.copies.value), offsetY:Number(els.offsetY.value),
         onProgress:(s)=>status(typeof s==="string" ? s : "Druck läuft …","info")
       });
       const entry={
         id:uuid(), qr_text:qr, caption:els.caption.value.trim(), printer:activePrinter?.name || "NIIMBOT",
-        copies:Number(els.copies.value), density:Number(els.density.value), created_at:now()
+        label_size:els.labelSize.value, copies:Number(els.copies.value), density:Number(els.density.value), created_at:now()
       };
       try { await provider.addHistory(entry); await refreshLists(); } catch(_){}
       status("Druckauftrag vom Drucker bestätigt.","ok"); toast("Gedruckt");
@@ -263,14 +341,13 @@
 
   async function sharePng() {
     try {
-      render(true);
       const blob=await canvasBlob();
-      const file=new File([blob],"qr-label.png",{type:"image/png"});
-      if(navigator.canShare && navigator.canShare({files:[file]})) {
-        await navigator.share({files:[file],title:"QR Label"});
-      } else downloadBlob(blob,"qr-label.png");
+      const file=new File([blob],`qr-label-${els.labelSize.value}.png`,{type:"image/png"});
+      if(navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file],title:"QR Label"});
+      else downloadBlob(blob,file.name);
     } catch(e){ if(e.name!=="AbortError") status("Teilen fehlgeschlagen: "+e.message,"warn"); }
   }
+
   function downloadBlob(blob,name) {
     const a=document.createElement("a"); const u=URL.createObjectURL(blob);
     a.href=u; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(u),1000);
@@ -292,7 +369,7 @@
   async function importBackup(file) {
     try {
       const payload=JSON.parse(await file.text());
-      if(payload.format!=="qr-label-backup" || payload.version!==1) throw new Error("Unbekanntes Backup-Format.");
+      if(payload.format!=="qr-label-backup" || ![1,2].includes(Number(payload.version))) throw new Error("Unbekanntes Backup-Format.");
       const ni=payload.data?.items?.length||0, nh=payload.data?.history?.length||0;
       const replace=confirm(`Backup enthält ${ni} Vorlagen und ${nh} Verlaufseinträge.\n\nOK = bestehende Daten ERSETZEN\nAbbrechen = zusammenführen`);
       if(!replace && !confirm("Backup mit bestehenden Daten zusammenführen?")) return;
@@ -334,9 +411,7 @@
     const merged = new URLSearchParams(location.search);
     let hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
     if (hash.startsWith("?")) hash = hash.slice(1);
-    if (hash && hash.includes("=")) {
-      for (const [k,v] of new URLSearchParams(hash)) merged.set(k,v);
-    }
+    if (hash && hash.includes("=")) for (const [k,v] of new URLSearchParams(hash)) merged.set(k,v);
     return merged;
   }
 
@@ -349,64 +424,62 @@
     shortcutNotice = "";
     const params = shortcutParams();
     if (![...params.keys()].length) return false;
-
     let changed = false;
-    const qr = params.get("qr");
-    const caption = params.get("text") ?? params.get("caption");
-    if (qr !== null) { els.qrText.value = qr; changed = true; }
-    if (caption !== null) { els.caption.value = caption; changed = true; }
 
-    if (params.has("copies")) {
-      els.copies.value = String(clampInt(params.get("copies"),1,20,1));
-      changed = true;
+    const source = params.get("quickchart") ?? params.get("source");
+    if (source !== null) {
+      if (isQuickChartQrUrl(source)) changed = await importQuickChartFromValue(source,{announce:false}) || changed;
+      else { els.qrText.value=source; changed=true; }
+    } else {
+      const qr = params.get("qr");
+      const caption = params.get("text") ?? params.get("caption");
+      if (qr !== null) {
+        if (isQuickChartQrUrl(qr)) changed = await importQuickChartFromValue(qr,{announce:false}) || changed;
+        else { els.qrText.value = qr; changed = true; }
+      }
+      if (caption !== null && !isQuickChartQrUrl(qr || "")) { els.caption.value = caption; changed = true; }
     }
-    if (params.has("density")) {
-      els.density.value = String(clampInt(params.get("density"),1,5,3));
-      els.densityOut.value = els.density.value;
-      changed = true;
-    }
-    if (params.has("offset")) {
-      els.offsetY.value = String(clampInt(params.get("offset"),-40,40,Number(els.offsetY.value)||0));
-      changed = true;
-    }
+
+    if (params.has("copies")) { els.copies.value = String(clampInt(params.get("copies"),1,20,1)); changed = true; }
+    if (params.has("density")) { els.density.value = String(clampInt(params.get("density"),1,5,3)); els.densityOut.value = els.density.value; changed = true; }
+    if (params.has("offset")) { els.offsetY.value = String(clampInt(params.get("offset"),-60,60,Number(els.offsetY.value)||0)); changed = true; }
     if (params.has("ecc")) {
       const ecc = String(params.get("ecc")||"").toUpperCase();
       if (["L","M","Q","H"].includes(ecc)) { els.ecc.value=ecc; changed=true; }
     }
-    if (params.has("size") && !["50x30","50×30"].includes(String(params.get("size")).toLowerCase())) {
-      shortcutNotice = `Labelgröße ${params.get("size")} wird in v3 noch nicht unterstützt; verwendet wird 50×30 mm.`;
-      changed = true;
+    const sizeParam = String(params.get("label") ?? params.get("size") ?? "").toLowerCase().replace("×","x");
+    if (sizeParam) {
+      if (validLabelSizes.has(sizeParam)) { setLabelSize(sizeParam,{persist:false,resetOffset:!params.has("offset")}); changed=true; }
+      else { shortcutNotice = `Labelformat ${sizeParam} wird nicht unterstützt. Verfügbar: ${[...validLabelSizes].join(", ")}.`; changed=true; }
+    }
+    if (params.has("captionpct")) {
+      const pct=Math.max(0,Math.min(25,Number(params.get("captionpct"))||0));
+      els.captionScale.value=String(pct); changed=true;
     }
 
     const ap = String(params.get("autoprint")||"").toLowerCase();
     shortcutAutoprint = ["1","true","yes","ja"].includes(ap);
 
     if (changed) {
-      render(true);
-      dirty = false;
+      await LocalStore.setSetting("draftQr",els.qrText.value);
+      await LocalStore.setSetting("draftCaption",els.caption.value);
+      render(true); dirty = false;
       if (announce) {
         if (shortcutNotice) status(shortcutNotice,"warn");
         else if (shortcutAutoprint && connected) status("Kurzbefehl übernommen – Druck startet …","info");
         else if (shortcutAutoprint) status("Kurzbefehl übernommen. B1 verbinden – danach startet der Druck automatisch.","ok");
         else status("Kurzbefehl übernommen. Vorschau ist druckbereit.","ok");
       }
-      if (shortcutAutoprint && connected) {
-        shortcutAutoprint = false;
-        await printLabel();
-      }
+      if (shortcutAutoprint && connected) { shortcutAutoprint = false; await printLabel(); }
     }
     return changed;
   }
 
   function browserMessage() {
     const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
-    if(B1Printer.supported()){
-      status(ios ? "Web Bluetooth ist verfügbar – wahrscheinlich über Bluefy/WebBLE. B1 einschalten und verbinden." : "Web Bluetooth verfügbar. B1 einschalten und verbinden.","ok");
-    } else if(ios) {
-      status("iPhone/iPad erkannt: Safari/Chrome können den B1 nicht direkt ansprechen. Öffne diese Seite in Bluefy.","warn");
-    } else {
-      status("Web Bluetooth nicht verfügbar. Verwende auf Android Chrome/Edge/Samsung Internet oder auf Desktop Chrome/Edge.","warn");
-    }
+    if(B1Printer.supported()) status(ios ? "Web Bluetooth ist verfügbar – wahrscheinlich über Bluefy/WebBLE. B1 einschalten und verbinden." : "Web Bluetooth verfügbar. B1 einschalten und verbinden.","ok");
+    else if(ios) status("iPhone/iPad erkannt: Safari/Chrome können den B1 nicht direkt ansprechen. Öffne diese Seite in Bluefy.","warn");
+    else status("Web Bluetooth nicht verfügbar. Verwende auf Android Chrome/Edge oder auf Desktop Chrome/Edge.","warn");
   }
 
   async function registerSW() {
@@ -416,13 +489,9 @@
       if(reg.waiting){ waitingWorker=reg.waiting; showUpdate(); }
       reg.addEventListener("updatefound",()=>{
         const nw=reg.installing;
-        nw?.addEventListener("statechange",()=>{
-          if(nw.state==="installed" && navigator.serviceWorker.controller){ waitingWorker=nw; showUpdate(); }
-        });
+        nw?.addEventListener("statechange",()=>{ if(nw.state==="installed" && navigator.serviceWorker.controller){ waitingWorker=nw; showUpdate(); } });
       });
-      navigator.serviceWorker.addEventListener("message",e=>{
-        if(e.data?.type==="VERSION") els.updateStatus.textContent=`v${APP_VERSION} · Cache ${e.data.version}`;
-      });
+      navigator.serviceWorker.addEventListener("message",e=>{ if(e.data?.type==="VERSION") els.updateStatus.textContent=`v${APP_VERSION} · Cache ${e.data.version}`; });
       navigator.serviceWorker.addEventListener("controllerchange",()=>{
         if(sessionStorage.getItem("qr-label-reloaded")==="1") return;
         sessionStorage.setItem("qr-label-reloaded","1");
@@ -431,20 +500,16 @@
       if(reg.active) reg.active.postMessage({type:"GET_VERSION"});
     }catch(e){ els.updateStatus.textContent="Service Worker Fehler"; }
   }
-  function showUpdate(){
-    els.updateStatus.textContent=`v${APP_VERSION} · neue Version bereit`;
-    els.updateBtn.classList.remove("hidden");
-  }
+  function showUpdate(){ els.updateStatus.textContent=`v${APP_VERSION} · neue Version bereit`; els.updateBtn.classList.remove("hidden"); }
   function applyUpdate(){
     if(!waitingWorker) return;
     if(dirty){ toast("Aktualisierung erst nach Abschluss der laufenden Aktion"); return; }
-    sessionStorage.removeItem("qr-label-reloaded");
-    waitingWorker.postMessage({type:"SKIP_WAITING"});
+    sessionStorage.removeItem("qr-label-reloaded"); waitingWorker.postMessage({type:"SKIP_WAITING"});
   }
 
   async function init() {
-    ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","ecc","labelCanvas","labelInfo","renderState",
-     "density","densityOut","copies","offsetY","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn",
+    ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","labelSize","ecc","labelCanvas","labelInfo","renderState",
+     "density","densityOut","copies","offsetY","captionScale","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn",
      "modeBadge","serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     els.appVersion.textContent="v"+APP_VERSION;
@@ -452,19 +517,26 @@
     els.caption.value=await LocalStore.getSetting("draftCaption","");
     els.density.value=await LocalStore.getSetting("density",3); els.densityOut.value=els.density.value;
     els.copies.value=await LocalStore.getSetting("copies",1);
-    els.offsetY.value=await LocalStore.getSetting("offsetY",4);
+    els.captionScale.value=await LocalStore.getSetting("captionScale",0);
+    const savedSize=await LocalStore.getSetting("labelSize","50x30");
+    setLabelSize(validLabelSizes.has(savedSize)?savedSize:"50x30",{persist:false,resetOffset:false});
+    els.offsetY.value=await LocalStore.getSetting("offsetY",printerGeometry().size.offset_y_px ?? 0);
     await loadProvider();
 
-    ["qrText","caption","ecc","invert"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; render(); }));
+    ["qrText","caption","ecc","invert","captionScale"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; render(); }));
     els.qrText.addEventListener("input",()=>LocalStore.setSetting("draftQr",els.qrText.value));
+    els.qrText.addEventListener("paste",()=>setTimeout(()=>importQuickChartFromValue(els.qrText.value,{announce:true}),0));
+    els.qrText.addEventListener("change",()=>importQuickChartFromValue(els.qrText.value,{announce:true}));
     els.caption.addEventListener("input",()=>LocalStore.setSetting("draftCaption",els.caption.value));
+    els.captionScale.addEventListener("change",()=>LocalStore.setSetting("captionScale",Number(els.captionScale.value)||0));
+    els.labelSize.addEventListener("change",()=>setLabelSize(els.labelSize.value,{persist:true,resetOffset:true}));
     els.density.addEventListener("input",()=>{ els.densityOut.value=els.density.value; LocalStore.setSetting("density",Number(els.density.value)); });
     els.copies.addEventListener("change",()=>LocalStore.setSetting("copies",Number(els.copies.value)));
     els.offsetY.addEventListener("change",()=>LocalStore.setSetting("offsetY",Number(els.offsetY.value)));
     els.connectBtn.addEventListener("click",connectPrinter);
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",sharePng);
-    els.savePngBtn.addEventListener("click",async()=>{ render(true); downloadBlob(await canvasBlob(),"qr-label.png"); });
+    els.savePngBtn.addEventListener("click",async()=>downloadBlob(await canvasBlob(),`qr-label-${els.labelSize.value}.png`));
     els.savePresetBtn.addEventListener("click",savePreset);
     els.refreshItemsBtn.addEventListener("click",refreshLists);
     document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener("change",()=>changeMode(r.value)));
