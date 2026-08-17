@@ -28,7 +28,7 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v1 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v3 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     active = MODELS[id];
     // Safe default for B1 and CoreBluetooth/iOS.

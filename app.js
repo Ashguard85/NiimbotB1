@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "1";
+  const APP_VERSION = "3";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -10,6 +10,8 @@
   let waitingWorker = null;
   let dirty = false;
   let renderTimer;
+  let shortcutAutoprint = false;
+  let shortcutNotice = "";
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
@@ -220,8 +222,12 @@
       els.offsetY.value=activePrinter.size.offset_y_px || 0;
       render();
       const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
-      const extra = ios && activePrinter.id===4096 ? " B1 + iOS/Bluefy ist in dieser v1 ein Hardware-Testpunkt." : "";
+      const extra = ios && activePrinter.id===4096 ? " B1 + iOS/Bluefy ist in dieser v3 ein Hardware-Testpunkt." : "";
       status(`${activePrinter.name} erkannt. Bereit zum Drucken.${extra}`,"ok");
+      if (shortcutAutoprint && els.qrText.value.trim()) {
+        shortcutAutoprint = false;
+        await printLabel();
+      }
     } catch(e) {
       setConnected(false);
       status("Verbindung fehlgeschlagen: "+e.message,"error");
@@ -324,6 +330,74 @@
     catch(e){ status("Server nicht erreichbar: "+e.message,"error"); }
   }
 
+  function shortcutParams() {
+    const merged = new URLSearchParams(location.search);
+    let hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
+    if (hash.startsWith("?")) hash = hash.slice(1);
+    if (hash && hash.includes("=")) {
+      for (const [k,v] of new URLSearchParams(hash)) merged.set(k,v);
+    }
+    return merged;
+  }
+
+  function clampInt(value, min, max, fallback) {
+    const n = Number.parseInt(value, 10);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  }
+
+  async function applyShortcutParams({announce=true}={}) {
+    shortcutNotice = "";
+    const params = shortcutParams();
+    if (![...params.keys()].length) return false;
+
+    let changed = false;
+    const qr = params.get("qr");
+    const caption = params.get("text") ?? params.get("caption");
+    if (qr !== null) { els.qrText.value = qr; changed = true; }
+    if (caption !== null) { els.caption.value = caption; changed = true; }
+
+    if (params.has("copies")) {
+      els.copies.value = String(clampInt(params.get("copies"),1,20,1));
+      changed = true;
+    }
+    if (params.has("density")) {
+      els.density.value = String(clampInt(params.get("density"),1,5,3));
+      els.densityOut.value = els.density.value;
+      changed = true;
+    }
+    if (params.has("offset")) {
+      els.offsetY.value = String(clampInt(params.get("offset"),-40,40,Number(els.offsetY.value)||0));
+      changed = true;
+    }
+    if (params.has("ecc")) {
+      const ecc = String(params.get("ecc")||"").toUpperCase();
+      if (["L","M","Q","H"].includes(ecc)) { els.ecc.value=ecc; changed=true; }
+    }
+    if (params.has("size") && !["50x30","50×30"].includes(String(params.get("size")).toLowerCase())) {
+      shortcutNotice = `Labelgröße ${params.get("size")} wird in v3 noch nicht unterstützt; verwendet wird 50×30 mm.`;
+      changed = true;
+    }
+
+    const ap = String(params.get("autoprint")||"").toLowerCase();
+    shortcutAutoprint = ["1","true","yes","ja"].includes(ap);
+
+    if (changed) {
+      render(true);
+      dirty = false;
+      if (announce) {
+        if (shortcutNotice) status(shortcutNotice,"warn");
+        else if (shortcutAutoprint && connected) status("Kurzbefehl übernommen – Druck startet …","info");
+        else if (shortcutAutoprint) status("Kurzbefehl übernommen. B1 verbinden – danach startet der Druck automatisch.","ok");
+        else status("Kurzbefehl übernommen. Vorschau ist druckbereit.","ok");
+      }
+      if (shortcutAutoprint && connected) {
+        shortcutAutoprint = false;
+        await printLabel();
+      }
+    }
+    return changed;
+  }
+
   function browserMessage() {
     const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
     if(B1Printer.supported()){
@@ -405,7 +479,15 @@
     const online=()=>{ els.onlineState.textContent=navigator.onLine?"online":"offline"; };
     addEventListener("online",online); addEventListener("offline",online); online();
 
-    render(); browserMessage(); await refreshLists(); registerSW();
+    const shortcutApplied = await applyShortcutParams({announce:false});
+    render(true); browserMessage();
+    if (shortcutApplied) {
+      if (shortcutNotice) status(shortcutNotice,"warn");
+      else if (shortcutAutoprint) status("Kurzbefehl übernommen. B1 verbinden – danach startet der Druck automatisch.","ok");
+      else status("Kurzbefehl übernommen. Vorschau ist druckbereit.","ok");
+    }
+    await refreshLists(); registerSW();
+    addEventListener("hashchange",()=>applyShortcutParams({announce:true}));
     setTimeout(()=>{ dirty=false; },200);
   }
   addEventListener("DOMContentLoaded", init);

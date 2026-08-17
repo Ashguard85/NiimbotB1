@@ -1,4 +1,4 @@
-# Architekturentscheidungen v1
+# Architekturentscheidungen v3
 
 1. **Anwendungsfall**  
    QR-Inhalt eingeben, QR-Code lokal rendern, 50×30-mm-Label anzeigen und NIIMBOT B1/B1 Pro ohne NIIMBOT-App direkt per Web Bluetooth drucken. iPhone/iPad nutzen dafür einen Web-BLE-Browser wie Bluefy; Android nutzt einen Chromium-Browser.
@@ -16,13 +16,13 @@
    UI → DataProvider → LocalProvider oder ServerProvider. Der `B1Printer` ist separat, weil BLE nicht über den Datenprovider und nicht über den Server laufen soll.
 
 6. **Cloudflare/CORS/Security**  
-   Server-URL nur HTTPS (localhost-Ausnahme). Cloudflare-Service-Token wird nur lokal gespeichert, nicht exportiert. Backend erlaubt CORS nur für `PWA_ALLOWED_ORIGIN`. CSP verbietet Inline-Scripts/eval; v1 erlaubt nur die explizite Script-Origin `https://unpkg.com`.
+   Server-URL nur HTTPS (localhost-Ausnahme). Cloudflare-Service-Token wird nur lokal gespeichert, nicht exportiert. Backend erlaubt CORS nur für `PWA_ALLOWED_ORIGIN`. CSP verbietet Inline-Scripts/eval; v3 erlaubt nur die explizite Script-Origin `https://unpkg.com`.
 
 7. **Environment**  
    `APP_TITLE`, `APP_URL`, `PWA_ALLOWED_ORIGIN`, `BACKUP_KEEP`.
 
 8. **Backup/Migration**  
-   Backupformat `qr-label-backup` v1. SQLite-Schema v1 wird automatisch angelegt. Vor Server-Import wird ein SQLite-Backup erzeugt.
+   Backupformat `qr-label-backup` v2. SQLite-Schema v2 wird automatisch angelegt. Vor Server-Import wird ein SQLite-Backup erzeugt.
 
 9. **ZIP/Git/Deployment**  
    Beide ZIPs sind Repository-Root-Pakete. Der Import-Workflow verarbeitet genau ein geändertes top-level ZIP, schützt `.git` und sich selbst, entfernt das ZIP und pusht den importierten Stand.

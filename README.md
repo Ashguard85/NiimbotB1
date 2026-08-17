@@ -1,16 +1,16 @@
-# QR Label – Pages v1
+# QR Label – Pages v3
 
 Statische GitHub-Pages-PWA zum Erzeugen und direkten Drucken von QR-Labels auf NIIMBOT B1/B1 Pro via Web Bluetooth.
 
 ## Kurzarchitektur
 
-- Gemeinsame Frontend-Codebasis mit Docker v1.
+- Gemeinsame Frontend-Codebasis mit Docker v3.
 - Druckpfad ist immer lokal: Browser → Web Bluetooth → NIIMBOT.
 - `Lokal`: Vorlagen/Verlauf in IndexedDB.
-- `Server`: Vorlagen/Verlauf per HTTPS-API an Docker v1; Druck bleibt trotzdem lokal.
+- `Server`: Vorlagen/Verlauf per HTTPS-API an Docker v3; Druck bleibt trotzdem lokal.
 - Keine automatische Synchronisation zwischen Lokal und Server.
 - Vollständige lokale App-Shell via Service Worker.
-- Zwei gepinnte Laufzeitbibliotheken werden in v1 von unpkg geladen und nach erfolgreichem Online-Start opportunistisch gecacht. Details: `THIRD_PARTY_NOTICES.md`.
+- Zwei gepinnte Laufzeitbibliotheken werden in v3 von unpkg geladen und nach erfolgreichem Online-Start opportunistisch gecacht. Details: `THIRD_PARTY_NOTICES.md`.
 
 ## iPhone / iPad
 
@@ -65,12 +65,43 @@ Lokaler und Server-Modus verwenden:
 
 ## Update-Lifecycle
 
-Service Worker Cache: `qr-label-pwa-v1`.
+Service Worker Cache: `qr-label-pwa-v3`.
 Neue Versionen werden installiert und warten. Ein Update wird nicht mitten in einer laufenden Aktion erzwungen. Der Button `Jetzt aktualisieren` aktiviert einen wartenden Worker; es gibt maximal einen kontrollierten Reload.
 
-## Bekannte Grenzen v1
+## Kurzbefehle / URL-API
+
+Die App kann QR-Inhalte direkt aus einer URL übernehmen und sofort die Vorschau rendern. Datenschutzfreundlich bevorzugt als Fragment:
+
+```text
+https://USER.github.io/REPO/#qr=https%3A%2F%2Fexample.com%2Fabc&text=ABC&copies=1&density=3&autoprint=1
+```
+
+Unterstützte Parameter:
+- `qr`: QR-Inhalt
+- `text` oder `caption`: Text unter dem QR
+- `copies`: 1–20
+- `density`: 1–5
+- `offset`: -40 bis +40 Pixel
+- `ecc`: L/M/Q/H
+- `size`: v3 akzeptiert 50x30 (andere Größen werden noch nicht umgesetzt)
+- `autoprint=1`: nach erfolgreichem Verbinden automatisch drucken
+
+`#...` wird bevorzugt, weil URL-Fragmente nicht als Teil des HTTP-Requests an GitHub Pages geschickt werden. `?qr=...` funktioniert ebenfalls.
+
+Auf iPhone/iPad muss der Link für BLE-Druck in Bluefy geöffnet werden. Ein community-dokumentiertes Bluefy-URL-Schema ist `bluefy://open?url=<URL-CODIERT>`; weil dieses Schema nicht offiziell in der Bluefy-App-Store-Beschreibung dokumentiert ist, sollte es einmal auf dem Zielgerät getestet werden.
+
+## GitHub Pages – einmalige Aktivierung
+
+Vor dem ersten Deployment einmal im Repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**. Das normale `GITHUB_TOKEN` darf Pages nicht selbst erstmalig per `enablement: true` aktivieren; danach funktionieren Deploy- und ZIP-Workflows ohne diesen manuellen Schritt.
+
+## Bekannte Grenzen v3
 
 - B1/B1 Pro, 50×30-mm-Label.
 - iOS: Web-BLE-Browser erforderlich; Safari/Chrome allein reichen nicht.
 - B1 + Bluefy wurde in diesem Build nicht mit realer Hardware getestet.
-- Die beiden Drittanbieter-JS-Dateien liegen v1 noch nicht im Repository selbst, sondern sind gepinnt und werden gecacht.
+- Die beiden Drittanbieter-JS-Dateien liegen v3 noch nicht im Repository selbst, sondern sind gepinnt und werden gecacht.
+
+## Migration des ZIP-Importers von v2 auf v3
+Ein bestehender v2-Importer kann sich absichtlich nicht selbst überschreiben. Deshalb einmalig `.github/workflows/import-zip.yml` im GitHub-Webeditor ändern: im `rsync` statt nur `.github/workflows/import-zip.yml` den gesamten Pfad `.github/workflows/` ausschließen. Danach können Release-ZIPs keine Workflows mehr verändern; das vermeidet den GitHub-Fehler `refusing to allow a GitHub App to create or update workflow ... without workflows permission`.
+
+GitHub Pages muss einmalig unter **Settings → Pages → Build and deployment → Source: GitHub Actions** aktiviert sein. Der normale `GITHUB_TOKEN` wird nicht mit zusätzlichen PAT-/Workflow-Rechten erweitert.
