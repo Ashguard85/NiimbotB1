@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f6f7f9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="QR Label">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
+  <title>QR Label – NIIMBOT B1</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/favicon.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">NIIMBOT B1</div>
+      <h1>QR Label</h1>
+    </div>
+    <button id="modeBadge" class="badge" type="button" aria-label="Betriebsmodus öffnen">Lokal</button>
+  </header>
+
+  <main>
+    <section class="card editor-card" aria-labelledby="editorTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="editorTitle">Label</h2>
+          <p>QR-Code lokal erzeugen und direkt per Bluetooth drucken.</p>
+        </div>
+        <span id="appVersion" class="version">v1</span>
+      </div>
+
+      <label class="field">
+        <span>QR-Inhalt</span>
+        <textarea id="qrText" rows="3" maxlength="1600" spellcheck="false" placeholder="https://example.com/"></textarea>
+      </label>
+
+      <div class="two-col">
+        <label class="field">
+          <span>Text unter QR <small>optional</small></span>
+          <input id="caption" type="text" maxlength="60" placeholder="z. B. Gerät 17">
+        </label>
+        <label class="field">
+          <span>QR-Fehlerkorrektur</span>
+          <select id="ecc">
+            <option value="L">L – klein</option>
+            <option value="M" selected>M – normal</option>
+            <option value="Q">Q – hoch</option>
+            <option value="H">H – sehr hoch</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="preview-wrap">
+        <div class="preview-toolbar">
+          <span id="labelInfo">B1 · 50 × 30 mm · 384 × 240 px</span>
+          <span id="renderState">bereit</span>
+        </div>
+        <canvas id="labelCanvas" width="384" height="240" aria-label="Labelvorschau"></canvas>
+      </div>
+
+      <div class="primary-actions">
+        <button id="connectBtn" class="btn secondary" type="button">
+          <span class="dot" id="printerDot"></span>
+          <span id="connectLabel">B1 verbinden</span>
+        </button>
+        <button id="printBtn" class="btn primary" type="button" disabled>Drucken</button>
+      </div>
+
+      <div class="secondary-actions">
+        <button id="shareBtn" class="btn ghost" type="button">Teilen</button>
+        <button id="savePngBtn" class="btn ghost" type="button">PNG</button>
+        <button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button>
+      </div>
+
+      <div id="statusBox" class="status info" role="status" aria-live="polite">
+        Bluetooth-Unterstützung wird geprüft …
+      </div>
+    </section>
+
+    <section class="card">
+      <details open>
+        <summary>Druckeinstellungen</summary>
+        <div class="settings-grid">
+          <label class="field">
+            <span>Dichte</span>
+            <input id="density" type="range" min="1" max="5" step="1" value="3">
+            <output id="densityOut">3</output>
+          </label>
+          <label class="field">
+            <span>Kopien</span>
+            <input id="copies" type="number" min="1" max="20" value="1" inputmode="numeric">
+          </label>
+          <label class="field">
+            <span>Vertikaler Offset (px)</span>
+            <input id="offsetY" type="number" min="-30" max="30" value="4" inputmode="numeric">
+          </label>
+          <label class="switch-row">
+            <input id="invert" type="checkbox">
+            <span>Schwarz/Weiß invertieren</span>
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Vorlagen & Verlauf</summary>
+        <div class="stack">
+          <div class="subhead">
+            <strong>Vorlagen</strong>
+            <button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button>
+          </div>
+          <div id="presetList" class="list empty">Noch keine Vorlagen.</div>
+          <div class="subhead history-head"><strong>Letzte Drucke</strong></div>
+          <div id="historyList" class="list empty">Noch keine Drucke.</div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>Setup, Daten & Update</summary>
+        <div class="stack">
+          <div class="mode-picker">
+            <div>
+              <strong>Betriebsmodus</strong>
+              <p>Der Druck läuft in beiden Modi direkt vom Browser zum Drucker.</p>
+            </div>
+            <label><input type="radio" name="mode" value="local" checked> Lokal</label>
+            <label><input type="radio" name="mode" value="server"> Server</label>
+          </div>
+
+          <div id="serverSettings" class="server-settings hidden">
+            <label class="field">
+              <span>Backend URL</span>
+              <input id="backendUrl" type="url" placeholder="https://api.example.com">
+            </label>
+            <label class="field">
+              <span>Cloudflare Client ID <small>optional</small></span>
+              <input id="cfClientId" type="text" autocomplete="off">
+            </label>
+            <label class="field">
+              <span>Cloudflare Client Secret <small>nur lokal gespeichert</small></span>
+              <input id="cfClientSecret" type="password" autocomplete="new-password">
+            </label>
+            <div class="row">
+              <button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button>
+              <button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button>
+              <button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button>
+            </div>
+          </div>
+
+          <div class="data-actions">
+            <button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button>
+            <label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label>
+          </div>
+
+          <div class="update-box">
+            <div>
+              <strong>App-Version</strong>
+              <div id="updateStatus">v1 · wird geprüft</div>
+            </div>
+            <button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button>
+          </div>
+
+          <p class="privacy-note">
+            Lokale Daten liegen nur auf diesem Gerät. Beim Löschen der Website-Daten, Entfernen der App oder Verlust des Geräts können sie verloren gehen. Zugangsdaten und Cloudflare-Secrets werden niemals in Backups exportiert.
+          </p>
+        </div>
+      </details>
+    </section>
+
+    <section class="card support-card">
+      <details>
+        <summary>iPhone / iPad</summary>
+        <div class="stack">
+          <p><strong>Safari und Chrome auf iOS stellen Web Bluetooth nicht bereit.</strong> Zum direkten Druck wird ein Web-BLE-Browser wie Bluefy benötigt.</p>
+          <ol>
+            <li>Bluefy aus dem App Store installieren.</li>
+            <li>Bluetooth für Bluefy erlauben und Bluetooth am Gerät einschalten.</li>
+            <li>Diese HTTPS-Seite direkt in Bluefy öffnen.</li>
+            <li>B1 einschalten, „B1 verbinden“ antippen und im Bluetooth-Dialog auswählen.</li>
+            <li>QR-Code erzeugen und „Drucken“ antippen.</li>
+          </ol>
+          <p class="muted">Der Open-Source-Treiber wurde auf iPhone + Bluefy mit B1 Pro getestet. Der normale B1 nutzt denselben Web-Bluetooth-Verbindungsweg, ist aber in dieser speziellen iOS-Kombination als Hardware-Testpunkt markiert.</p>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    <span>QR Label v1</span>
+    <span id="onlineState">online</span>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Pinned third-party libraries. The service worker caches these after a successful online load. -->
+  <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
+  <script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script>
+  <script src="./storage.js" defer></script>
+  <script src="./providers.js" defer></script>
+  <script src="./printer.js" defer></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
