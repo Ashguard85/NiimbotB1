@@ -1,4 +1,4 @@
-# Apple Kurzbefehle / URL-API – v8
+# Apple Kurzbefehle / URL-API – v7
 
 ## Direkter QR-Inhalt
 
@@ -47,3 +47,9 @@ Browser dürfen die erstmalige Bluetooth-Geräteauswahl nicht ohne Benutzeraktio
 1. Vorschau sofort erzeugen,
 2. `B1 verbinden` antippen und Drucker auswählen, falls noch nicht verbunden,
 3. direkt danach automatisch drucken.
+
+
+### Jira-/Assets-Link direkt übergeben
+`#url=https%3A%2F%2Fsupport.braendi.ch%2Fsecure%2FShowObject.jspa%3Fid%3D43322`
+
+Bei aktivierter automatischer Asset-Caption wird daraus standardmäßig `IAM-43322`.

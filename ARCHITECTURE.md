@@ -1,4 +1,4 @@
-# Architektur v8
+# Architektur v7
 
 ```text
 Gemeinsames Frontend

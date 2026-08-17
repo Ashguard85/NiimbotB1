@@ -9,20 +9,32 @@
   <meta name="apple-mobile-web-app-title" content="QR Label">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob: https://quickchart.io; connect-src 'self' https://quickchart.io https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=8">
+  <link rel="manifest" href="./manifest.webmanifest?v=9">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=8">
+  <link rel="stylesheet" href="./app.css?v=9">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><div class="eyebrow">NIIMBOT B1</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v8</span></div></div>
+  <div class="brand"><div class="eyebrow">NIIMBOT B1</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v9</span></div></div>
   <div class="top-actions"><span id="onlineBadge" class="top-pill">Online</span><button id="modeBadge" class="top-pill button-pill" type="button">Lokal</button><button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen">⚙︎</button></div>
 </header>
 
 <main class="page-shell">
   <section class="workspace">
     <article class="panel controls-panel">
+      <div class="field-block capture-block">
+        <span class="label-title">Schnell erfassen</span>
+        <p class="hint">Jira-/Assets-QR direkt scannen, ein Foto mit QR auslesen oder einen kopierten Link übernehmen.</p>
+        <div class="capture-actions">
+          <button id="scanQrBtn" type="button" class="capture-btn"><strong>▣ QR scannen</strong><small>Kamera live</small></button>
+          <button id="scanImageBtn" type="button" class="capture-btn"><strong>▧ Foto / Bild</strong><small>QR aus Bild lesen</small></button>
+          <button id="pasteLinkBtn" type="button" class="capture-btn"><strong>⌘ Link einfügen</strong><small>Zwischenablage</small></button>
+        </div>
+        <input id="scanImageInput" class="sr-only" type="file" accept="image/*">
+        <div id="captureStatus" class="inline-status neutral"><span>i</span><span>Bei Jira Assets wird z. B. <b>id=43322</b> automatisch zu <b>IAM-43322</b>.</span></div>
+      </div>
+
       <div class="field-block">
         <label for="sourceInput" class="label-title">QR-Inhalt oder QuickChart-Link <span class="help-dot" title="Normale Ziel-URL oder kompletter QuickChart-Link">?</span></label>
         <p class="hint">Füge eine URL oder einen QuickChart-QR-Link ein. Ein Feld genügt.</p>
@@ -40,6 +52,10 @@
         <label for="caption" class="label-title">Text unter QR (Caption) <span class="help-dot" title="Wird direkt unter dem QR-Code gedruckt">?</span></label>
         <p class="hint">Wird unter dem QR-Code angezeigt.</p>
         <input id="caption" type="text" maxlength="120" placeholder="IAM-43322">
+        <div class="asset-caption-row">
+          <label class="check-line"><input id="autoAssetCaption" type="checkbox" checked> Jira-/Assets-ID automatisch übernehmen</label>
+          <label class="prefix-field"><span>Prefix</span><input id="jiraPrefix" type="text" value="IAM" maxlength="20" autocomplete="off" spellcheck="false"></label>
+        </div>
       </div>
 
       <div class="field-block">
@@ -82,7 +98,7 @@
         <button id="connectBtn" class="btn secondary" type="button"><span class="dot" id="printerDot"></span><span id="connectLabel">B1 verbinden</span></button>
         <button id="printBtn" class="btn primary wide" type="button" disabled>Drucken</button>
       </div>
-      <div class="export-actions"><button id="savePngBtn" class="btn ghost" type="button">Als PNG speichern</button><button id="savePdfBtn" class="btn ghost" type="button">Als PDF speichern</button><button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button><button id="shareBtn" class="btn ghost" type="button">Teilen</button></div>
+      <div class="export-actions"><button id="savePngBtn" class="btn ghost" type="button">PNG teilen / sichern</button><button id="savePdfBtn" class="btn ghost" type="button">PDF teilen / sichern</button><button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button><button id="shareBtn" class="btn ghost" type="button">QR-Ziel teilen</button></div>
       <div id="statusBox" class="status info" role="status" aria-live="polite">Bluetooth-Unterstützung wird geprüft …</div>
     </article>
 
@@ -106,9 +122,19 @@
 
   <section id="settingsSection" class="below-grid">
     <article class="panel"><details><summary>Vorlagen & Verlauf</summary><div class="stack"><div class="subhead"><strong>Vorlagen</strong><button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button></div><div id="presetList" class="list empty">Noch keine Vorlagen.</div><div class="subhead history-head"><strong>Letzte Drucke</strong></div><div id="historyList" class="list empty">Noch keine Drucke.</div></div></details></article>
-    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v8 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
+    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v9 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
   </section>
 </main>
-<footer><span>QR Label v8</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=8" defer></script><script src="./providers.js?v=8" defer></script><script src="./printer.js?v=8" defer></script><script src="./app.js?v=8" defer></script>
+<div id="scanModal" class="scanner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+  <div class="scanner-sheet">
+    <div class="scanner-head"><div><strong id="scanTitle">QR-Code scannen</strong><small>Halte den Jira-/Assets-QR vollständig in den Rahmen.</small></div><button id="scanCloseBtn" type="button" class="icon-btn" aria-label="Scanner schließen">×</button></div>
+    <div class="scanner-video-wrap"><video id="scanVideo" playsinline muted></video><div class="scanner-guide"><span></span></div></div>
+    <canvas id="scanCanvas" class="sr-only"></canvas>
+    <div id="scanStatus" class="status info">Kamera wird gestartet …</div>
+    <div class="scanner-actions"><button id="scanPhotoFallbackBtn" type="button" class="btn secondary">Foto / Bild wählen</button><button id="scanCancelBtn" type="button" class="btn secondary">Abbrechen</button></div>
+  </div>
+</div>
+
+<footer><span>QR Label v9</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=9" defer></script><script src="./providers.js?v=9" defer></script><script src="./printer.js?v=9" defer></script><script src="./app.js?v=9" defer></script>
 </body></html>

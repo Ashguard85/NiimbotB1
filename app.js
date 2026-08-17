@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "8";
+  const APP_VERSION = "9";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -18,6 +18,11 @@
   let renderGeneration = 0;
   let quickChartCache = {url:"", blob:null};
   let previewZoom = 1;
+  let scanStream = null;
+  let scanRaf = 0;
+  let scanLastFrame = 0;
+  let autoCaptionValue = "";
+  let nativeQrDetector = undefined;
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
@@ -351,7 +356,7 @@
     if (!parsed) return false;
     if (els.sourceInput) els.sourceInput.value = String(value).trim();
     els.qrText.value = parsed.text;
-    if (parsed.caption !== null) els.caption.value = parsed.caption;
+    if (parsed.caption !== null) { els.caption.value = parsed.caption; autoCaptionValue=parsed.caption; els.caption.dataset.auto="1"; }
     if (parsed.ecLevel) els.ecc.value = parsed.ecLevel;
     if (parsed.captionPct !== null) els.captionScale.value = parsed.captionPct.toFixed(1).replace(/\.0$/,"");
     quickChartReferenceSize = Number.isFinite(parsed.refSize) ? parsed.refSize : 0;
@@ -375,6 +380,193 @@
       toast("QuickChart übernommen");
     }
     return true;
+  }
+
+  function sanitizePrefix(value) {
+    const clean=String(value||"IAM").trim().toUpperCase().replace(/[^A-Z0-9_-]+/g,"").slice(0,20);
+    return clean || "IAM";
+  }
+
+  function detectAssetCaption(value) {
+    const raw=String(value||"").trim();
+    if(!raw) return null;
+    const direct=raw.match(/\b([A-Z][A-Z0-9_]{1,20}-\d+)\b/i);
+    try {
+      const u=new URL(raw);
+      const candidates=[u.searchParams.get("objectKey"),u.searchParams.get("key"),u.searchParams.get("assetKey")].filter(Boolean);
+      for(const v of candidates){ const m=String(v).match(/^([A-Z][A-Z0-9_]{1,20}-\d+)$/i); if(m) return m[1].toUpperCase(); }
+      const pathKey=u.pathname.match(/(?:browse|object|objects|assets?)\/([A-Z][A-Z0-9_]{1,20}-\d+)/i);
+      if(pathKey) return pathKey[1].toUpperCase();
+      const id=u.searchParams.get("id") || u.searchParams.get("objectId") || u.searchParams.get("assetId");
+      const jiraish=/ShowObject\.jspa/i.test(u.pathname) || /atlassian|jira/i.test(u.hostname+u.pathname) || /\/assets?\//i.test(u.pathname);
+      if(jiraish && id && /^\d+$/.test(id)) return `${sanitizePrefix(els.jiraPrefix?.value)}-${id}`;
+    } catch(_) {}
+    if(direct && /^IAM-/i.test(direct[1])) return direct[1].toUpperCase();
+    return null;
+  }
+
+  async function maybeApplyAssetCaption(value,{force=false}={}) {
+    if(!els.autoAssetCaption?.checked) return null;
+    const derived=detectAssetCaption(value);
+    if(!derived) return null;
+    const current=els.caption.value.trim();
+    if(force || !current || current===autoCaptionValue) {
+      els.caption.value=derived;
+      autoCaptionValue=derived;
+      els.caption.dataset.auto="1";
+      await LocalStore.setSetting("draftCaption",derived);
+      if(els.captureStatus){ els.captureStatus.className="inline-status"; els.captureStatus.innerHTML=`<span>✓</span><span>Jira/Assets erkannt: Caption <b>${derived}</b> automatisch übernommen.</span>`; }
+      return derived;
+    }
+    return null;
+  }
+
+  async function applyCapturedValue(value,{origin="Eingabe",announce=true}={}) {
+    const raw=String(value||"").trim();
+    if(!raw) return false;
+    els.sourceInput.value=raw;
+    await LocalStore.setSetting("draftSource",raw);
+    if(isQuickChartQrUrl(raw)) {
+      const ok=await importQuickChartFromValue(raw,{announce:false});
+      if(ok && announce) status(`${origin}: QuickChart-Link übernommen.`,'ok');
+      return ok;
+    }
+    quickChartTemplateParams=null; quickChartReferenceSize=0; setImportStatus(false);
+    els.qrText.value=raw;
+    await LocalStore.setSetting("draftQr",raw);
+    const cap=await maybeApplyAssetCaption(raw,{force:false});
+    render(true);
+    if(announce) status(cap ? `${origin}: QR-Ziel übernommen · Caption ${cap}.` : `${origin}: QR-Ziel übernommen.`,'ok');
+    return true;
+  }
+
+  function stopScanner() {
+    if(scanRaf){ cancelAnimationFrame(scanRaf); scanRaf=0; }
+    if(scanStream){ for(const t of scanStream.getTracks()) t.stop(); scanStream=null; }
+    if(els.scanVideo) els.scanVideo.srcObject=null;
+    els.scanModal?.classList.add("hidden");
+  }
+
+  async function getNativeQrDetector() {
+    if(nativeQrDetector!==undefined) return nativeQrDetector;
+    nativeQrDetector=null;
+    try{
+      if("BarcodeDetector" in window){
+        const formats=BarcodeDetector.getSupportedFormats ? await BarcodeDetector.getSupportedFormats() : ["qr_code"];
+        if(formats.includes("qr_code")) nativeQrDetector=new BarcodeDetector({formats:["qr_code"]});
+      }
+    }catch(_) { nativeQrDetector=null; }
+    return nativeQrDetector;
+  }
+
+  function decodeQrImageData(imageData) {
+    if(typeof window.jsQR!=="function") return null;
+    return window.jsQR(imageData.data,imageData.width,imageData.height,{inversionAttempts:"attemptBoth"});
+  }
+
+  async function decodeQrCanvas(canvas,ctx) {
+    const native=await getNativeQrDetector();
+    if(native){
+      try{ const found=await native.detect(canvas); if(found?.length) return {data:found[0].rawValue}; }catch(_){}
+    }
+    const code=decodeQrImageData(ctx.getImageData(0,0,canvas.width,canvas.height));
+    if(code) return code;
+    if(!native && typeof window.jsQR!=="function") throw new Error("Kein QR-Decoder verfügbar. Für den ersten Scanner-Start bitte einmal online laden.");
+    return null;
+  }
+
+  async function scanLoop(ts) {
+    if(!scanStream || !els.scanVideo) return;
+    if(ts-scanLastFrame>120 && els.scanVideo.readyState>=2 && els.scanVideo.videoWidth>0){
+      scanLastFrame=ts;
+      try{
+        const maxW=900;
+        const scale=Math.min(1,maxW/els.scanVideo.videoWidth);
+        const w=Math.max(1,Math.round(els.scanVideo.videoWidth*scale));
+        const h=Math.max(1,Math.round(els.scanVideo.videoHeight*scale));
+        els.scanCanvas.width=w; els.scanCanvas.height=h;
+        const ctx=els.scanCanvas.getContext("2d",{willReadFrequently:true});
+        ctx.drawImage(els.scanVideo,0,0,w,h);
+        const code=await decodeQrCanvas(els.scanCanvas,ctx);
+        if(code?.data){
+          const data=code.data; stopScanner();
+          await applyCapturedValue(data,{origin:"Kamera",announce:true});
+          toast("QR-Code erkannt"); return;
+        }
+      }catch(e){ if(els.scanStatus){ els.scanStatus.className="status warn"; els.scanStatus.textContent="Scanner: "+e.message; } }
+    }
+    scanRaf=requestAnimationFrame(scanLoop);
+  }
+
+  async function startScanner() {
+    if(!navigator.mediaDevices?.getUserMedia){ els.scanImageInput.click(); status("Live-Kamera nicht verfügbar – bitte Foto/Bild wählen.","warn"); return; }
+    const native=await getNativeQrDetector();
+    if(!native && typeof window.jsQR!=="function"){ status("QR-Scanner ist noch nicht geladen. Für den ersten Start kurz online öffnen und Seite neu laden.","warn"); return; }
+    stopScanner();
+    els.scanModal.classList.remove("hidden");
+    els.scanStatus.className="status info"; els.scanStatus.textContent="Kamera wird gestartet …";
+    try{
+      scanStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:960}}});
+      els.scanVideo.srcObject=scanStream; await els.scanVideo.play();
+      els.scanStatus.className="status ok"; els.scanStatus.textContent="Kamera aktiv – QR-Code in den Rahmen halten.";
+      scanLastFrame=0; scanRaf=requestAnimationFrame(scanLoop);
+    }catch(e){
+      stopScanner();
+      status("Kamera konnte nicht geöffnet werden: "+e.message+". Nutze Foto / Bild als Fallback.","warn");
+      els.scanImageInput.click();
+    }
+  }
+
+  async function scanImageFile(file) {
+    if(!file) return;
+    try{
+      const native=await getNativeQrDetector();
+      if(!native && typeof window.jsQR!=="function") throw new Error("QR-Scanner-Bibliothek ist noch nicht geladen. Für den ersten Start kurz online öffnen.");
+      let image;
+      if(window.createImageBitmap) image=await createImageBitmap(file);
+      else image=await new Promise((resolve,reject)=>{ const img=new Image(); const u=URL.createObjectURL(file); img.onload=()=>{URL.revokeObjectURL(u);resolve(img)}; img.onerror=()=>{URL.revokeObjectURL(u);reject(new Error("Bild konnte nicht gelesen werden."))}; img.src=u; });
+      const max=1800, scale=Math.min(1,max/Math.max(image.width,image.height));
+      const w=Math.max(1,Math.round(image.width*scale)),h=Math.max(1,Math.round(image.height*scale));
+      const c=document.createElement("canvas"); c.width=w;c.height=h; const ctx=c.getContext("2d",{willReadFrequently:true}); ctx.drawImage(image,0,0,w,h);
+      if(typeof image.close==="function") image.close();
+      const code=await decodeQrCanvas(c,ctx);
+      if(!code?.data) throw new Error("Kein QR-Code im Bild gefunden.");
+      await applyCapturedValue(code.data,{origin:"Bild",announce:true}); toast("QR-Code aus Bild erkannt");
+    }catch(e){ status("QR aus Bild konnte nicht gelesen werden: "+e.message,"error"); }
+  }
+
+  async function pasteFromClipboard() {
+    try{
+      let text="";
+      if(navigator.clipboard?.readText) text=await navigator.clipboard.readText();
+      if(!text) text=prompt("Jira-/Assets-Link oder QuickChart-Link einfügen:","") || "";
+      if(text) await applyCapturedValue(text,{origin:"Zwischenablage",announce:true});
+    }catch(_){ const text=prompt("Zwischenablage konnte nicht gelesen werden. Link hier einfügen:","") || ""; if(text) await applyCapturedValue(text,{origin:"Eingabe",announce:true}); }
+  }
+
+  async function savePngSmart() {
+    try{
+      const blob=await canvasBlob();
+      const file=new File([blob],`qr-label-${els.labelSize.value}.png`,{type:"image/png"});
+      if(navigator.canShare && navigator.canShare({files:[file]})) {
+        await navigator.share({files:[file],title:"QR Label"});
+        toast("PNG an Teilen-Menü übergeben"); return;
+      }
+      const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
+      if(ios){
+        const u=URL.createObjectURL(blob); const win=window.open(u,"_blank");
+        if(win){ status("PNG wurde geöffnet. Über Teilen bzw. langes Drücken kannst du es in Dateien/Fotos sichern.","ok"); setTimeout(()=>URL.revokeObjectURL(u),60000); return; }
+      }
+      downloadBlob(blob,file.name); toast("PNG gespeichert");
+    }catch(e){ if(e.name!=="AbortError") status("PNG konnte nicht gesichert werden: "+e.message,"error"); }
+  }
+
+  async function shareQrTarget() {
+    const text=els.qrText.value.trim(); if(!text) return;
+    try{
+      if(navigator.share){ const data={title:els.caption.value.trim()||"QR Label",text}; if(/^https?:\/\//i.test(text)) data.url=text; await navigator.share(data); }
+      else if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); toast("QR-Ziel kopiert"); }
+    }catch(e){ if(e.name!=="AbortError") status("Teilen fehlgeschlagen: "+e.message,"warn"); }
   }
 
   async function loadProvider() {
@@ -678,16 +870,16 @@
     if (![...params.keys()].length) return false;
     let changed = false;
 
-    const source = params.get("quickchart") ?? params.get("source");
+    const source = params.get("quickchart") ?? params.get("source") ?? params.get("url");
     if (source !== null) {
       if (isQuickChartQrUrl(source)) changed = await importQuickChartFromValue(source,{announce:false}) || changed;
-      else { els.qrText.value=source; changed=true; }
+      else { els.sourceInput.value=source; els.qrText.value=source; await maybeApplyAssetCaption(source,{force:false}); changed=true; }
     } else {
       const qr = params.get("qr");
       const caption = params.get("text") ?? params.get("caption");
       if (qr !== null) {
         if (isQuickChartQrUrl(qr)) changed = await importQuickChartFromValue(qr,{announce:false}) || changed;
-        else { els.qrText.value = qr; changed = true; }
+        else { els.qrText.value = qr; await maybeApplyAssetCaption(qr,{force:false}); changed = true; }
       }
       if (caption !== null && !isQuickChartQrUrl(qr || "")) { els.caption.value = caption; changed = true; }
     }
@@ -762,13 +954,16 @@
   async function init() {
     ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
-     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
+     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     els.appVersion.textContent="v"+APP_VERSION;
     els.qrText.value=await LocalStore.getSetting("draftQr","");
     els.sourceInput.value=await LocalStore.getSetting("draftSource",els.qrText.value);
     els.caption.value=await LocalStore.getSetting("draftCaption","");
+    els.autoAssetCaption.checked=await LocalStore.getSetting("autoAssetCaption",true);
+    els.jiraPrefix.value=sanitizePrefix(await LocalStore.getSetting("jiraPrefix","IAM"));
+    if(els.autoAssetCaption.checked && new RegExp(`^${els.jiraPrefix.value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}-\\d+$`,"i").test(els.caption.value.trim())) { autoCaptionValue=els.caption.value.trim(); els.caption.dataset.auto="1"; }
     els.density.value=await LocalStore.getSetting("density",3); els.densityOut.value=els.density.value;
     els.copies.value=await LocalStore.getSetting("copies",1);
     els.captionScale.value=await LocalStore.getSetting("captionScale",0);
@@ -795,18 +990,15 @@
       quickChartDetectTimer=setTimeout(async()=>{
         const value=els.sourceInput.value.trim();
         if(!value) return;
-        if(isQuickChartQrUrl(value)) {
-          await importQuickChartFromValue(value,{announce:true});
-        } else {
-          quickChartTemplateParams=null; quickChartReferenceSize=0; setImportStatus(false);
-          els.qrText.value=value; await LocalStore.setSetting("draftQr",value); render(true);
-        }
+        if(value) await applyCapturedValue(value,{origin:"Eingabe",announce:false});
       },90);
     };
     els.sourceInput.addEventListener("input",processSource);
     els.sourceInput.addEventListener("paste",()=>setTimeout(processSource,0));
     els.sourceInput.addEventListener("change",processSource);
-    els.caption.addEventListener("input",()=>LocalStore.setSetting("draftCaption",els.caption.value));
+    els.caption.addEventListener("input",()=>{ els.caption.dataset.auto="0"; autoCaptionValue=""; LocalStore.setSetting("draftCaption",els.caption.value); });
+    els.autoAssetCaption.addEventListener("change",async()=>{ await LocalStore.setSetting("autoAssetCaption",els.autoAssetCaption.checked); if(els.autoAssetCaption.checked) await maybeApplyAssetCaption(els.qrText.value,{force:false}); render(true); });
+    els.jiraPrefix.addEventListener("change",async()=>{ els.jiraPrefix.value=sanitizePrefix(els.jiraPrefix.value); await LocalStore.setSetting("jiraPrefix",els.jiraPrefix.value); if(els.caption.dataset.auto==="1") await maybeApplyAssetCaption(els.qrText.value,{force:true}); render(true); });
     els.captionScale.addEventListener("input",()=>{ updateCaptionScaleUi(); LocalStore.setSetting("captionScale",Number(els.captionScale.value)||0); });
     els.renderMode.addEventListener("change",()=>{ LocalStore.setSetting("renderMode",els.renderMode.value); updateModeUi(); dirty=true; render(true); });
     els.labelSize.addEventListener("change",()=>setLabelSize(els.labelSize.value,{persist:true,resetOffset:true}));
@@ -822,10 +1014,18 @@
     els.density.addEventListener("input",()=>{ els.densityOut.value=els.density.value; LocalStore.setSetting("density",Number(els.density.value)); });
     els.copies.addEventListener("change",()=>LocalStore.setSetting("copies",Number(els.copies.value)));
     els.offsetY.addEventListener("change",()=>LocalStore.setSetting("offsetY",Number(els.offsetY.value)));
+    els.scanQrBtn.addEventListener("click",startScanner);
+    els.scanImageBtn.addEventListener("click",()=>els.scanImageInput.click());
+    els.pasteLinkBtn.addEventListener("click",pasteFromClipboard);
+    els.scanImageInput.addEventListener("change",()=>{ const f=els.scanImageInput.files?.[0]; if(f) scanImageFile(f).finally(()=>{els.scanImageInput.value="";}); });
+    els.scanCloseBtn.addEventListener("click",stopScanner);
+    els.scanCancelBtn.addEventListener("click",stopScanner);
+    els.scanPhotoFallbackBtn.addEventListener("click",()=>{ stopScanner(); els.scanImageInput.click(); });
+    els.scanModal.addEventListener("click",e=>{ if(e.target===els.scanModal) stopScanner(); });
     els.connectBtn.addEventListener("click",connectPrinter);
     els.printBtn.addEventListener("click",printLabel);
-    els.shareBtn.addEventListener("click",sharePng);
-    els.savePngBtn.addEventListener("click",async()=>downloadBlob(await canvasBlob(),`qr-label-${els.labelSize.value}.png`));
+    els.shareBtn.addEventListener("click",shareQrTarget);
+    els.savePngBtn.addEventListener("click",savePngSmart);
     els.savePdfBtn.addEventListener("click",savePdf);
     els.savePresetBtn.addEventListener("click",savePreset);
     els.refreshItemsBtn.addEventListener("click",refreshLists);
@@ -850,6 +1050,7 @@
     }
     await refreshLists(); registerSW();
     addEventListener("hashchange",()=>applyShortcutParams({announce:true}));
+    addEventListener("pagehide",stopScanner);
     setTimeout(()=>{ dirty=false; },200);
   }
   addEventListener("DOMContentLoaded", init);

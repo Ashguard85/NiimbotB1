@@ -21,3 +21,10 @@ The library generates QR matrices in the browser.
 v7 loads both pinned libraries from `unpkg.com`. The service worker caches them opportunistically after a successful online load, so they can be reused offline if the browser permits caching opaque cross-origin script responses.
 
 For a completely dependency-self-hosted deployment, copy the exact pinned JS files into `vendor/`, change the two `<script>` tags in `index.html`, update the service-worker cache list, and tighten CSP back to `script-src 'self'`.
+
+
+## jsQR
+- Projekt: cozmo/jsQR
+- Version: 1.4.0
+- Lizenz: Apache-2.0
+- Zweck: lokales Auslesen von QR-Codes aus Kamera-Frames und Bildern.
