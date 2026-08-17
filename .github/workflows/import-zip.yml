@@ -1,0 +1,87 @@
+name: Import uploaded ZIP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.zip"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  import-and-deploy:
+    if: github.actor != 'github-actions[bot]'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Find exactly one ZIP changed by this push
+        id: zip
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            mapfile -t zips < <(git diff --name-only --diff-filter=AM HEAD^ HEAD -- '*.zip')
+          else
+            mapfile -t zips < <(find . -maxdepth 1 -type f -name '*.zip' -printf '%f\n')
+          fi
+          if [ "${#zips[@]}" -ne 1 ]; then
+            echo "Expected exactly one new/modified top-level ZIP, found ${#zips[@]}."
+            printf '%s\n' "${zips[@]:-}"
+            exit 1
+          fi
+          echo "file=${zips[0]}" >> "$GITHUB_OUTPUT"
+      - name: Validate and unpack
+        shell: bash
+        env:
+          ZIPFILE: ${{ steps.zip.outputs.file }}
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          entries="$(unzip -Z1 "$ZIPFILE")"
+          if printf '%s\n' "$entries" | grep -Eq '(^|/)\.\.(/|$)|(^|/)\.git(/|$)'; then
+            echo "Unsafe ZIP path detected."; exit 1
+          fi
+          if printf '%s\n' "$entries" | grep -Eqi '(^|/)\.env($|/)|\.pem$|\.key$|(^|/)id_rsa($|\.)'; then
+            echo "Potential secret file detected in ZIP."; exit 1
+          fi
+          unzip -q "$ZIPFILE" -d "$tmp"
+          # ZIP contents represent repository root. Preserve this importer itself.
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/workflows/import-zip.yml' \
+            --exclude='*.zip' \
+            "$tmp"/ ./
+          rm -f "$ZIPFILE"
+      - name: Commit imported release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Import ZIP release"
+            git push
+          fi
+      # A push made with GITHUB_TOKEN does not normally trigger another workflow.
+      # Deploy the imported tree here so ZIP upload -> import -> Pages is one chain.
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy imported release
+        id: deployment
+        uses: actions/deploy-pages@v4
