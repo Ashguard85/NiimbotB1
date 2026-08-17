@@ -3,233 +3,112 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#f6f7f9">
+  <meta name="theme-color" content="#f7f9fc">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="QR Label">
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob: https://quickchart.io; connect-src 'self' https://quickchart.io https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=7">
+  <link rel="manifest" href="./manifest.webmanifest?v=8">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=7">
+  <link rel="stylesheet" href="./app.css?v=8">
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <div class="eyebrow">NIIMBOT B1</div>
-      <h1>QR Label</h1>
-    </div>
-    <button id="modeBadge" class="badge" type="button" aria-label="Betriebsmodus öffnen">Lokal</button>
-  </header>
+<header class="topbar">
+  <div class="brand"><div class="eyebrow">NIIMBOT B1</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v8</span></div></div>
+  <div class="top-actions"><span id="onlineBadge" class="top-pill">Online</span><button id="modeBadge" class="top-pill button-pill" type="button">Lokal</button><button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen">⚙︎</button></div>
+</header>
 
-  <main>
-    <section class="card editor-card" aria-labelledby="editorTitle">
-      <div class="section-head">
-        <div>
-          <h2 id="editorTitle">Label</h2>
-          <p>QR-Code lokal oder über QuickChart erzeugen und direkt per Bluetooth drucken.</p>
-        </div>
-        <span id="appVersion" class="version">v7</span>
+<main class="page-shell">
+  <section class="workspace">
+    <article class="panel controls-panel">
+      <div class="field-block">
+        <label for="sourceInput" class="label-title">QR-Inhalt oder QuickChart-Link <span class="help-dot" title="Normale Ziel-URL oder kompletter QuickChart-Link">?</span></label>
+        <p class="hint">Füge eine URL oder einen QuickChart-QR-Link ein. Ein Feld genügt.</p>
+        <textarea id="sourceInput" rows="4" spellcheck="false" placeholder="https://quickchart.io/qr?text=...&caption=..."></textarea>
+        <div id="importStatus" class="inline-status hidden"><span>✓</span><span>QuickChart-Link erkannt und alle Parameter übernommen.</span><button id="showParamsBtn" type="button" class="tiny-btn">Parameter anzeigen</button></div>
       </div>
 
-      <label class="field">
-        <span>QR-Inhalt oder QuickChart-Link <small>ein Feld genügt</small></span>
-        <textarea id="qrText" rows="3" maxlength="5000" spellcheck="false" placeholder="Ziel-URL oder https://quickchart.io/qr?text=...&caption=..."></textarea>
-        <small class="field-help">QuickChart-Link oder auch nur <code>text=…&amp;caption=…</code> einfügen: QR-Ziel, Caption, Fehlerkorrektur und Caption-Größe werden automatisch übernommen.</small>
-      </label>
-
-      <div class="three-col">
-        <label class="field">
-          <span>Text unter QR <small>optional</small></span>
-          <input id="caption" type="text" maxlength="120" placeholder="z. B. IAM-43322">
-        </label>
-        <label class="field">
-          <span>Labelformat</span>
-          <select id="labelSize">
-            <option value="40x40" selected>40 × 40 mm · Standard · abgeleitet</option>
-            <option value="50x30">50 × 30 mm · kalibriert</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>QR-Fehlerkorrektur</span>
-          <select id="ecc">
-            <option value="L">L – klein</option>
-            <option value="M" selected>M – normal</option>
-            <option value="Q">Q – hoch</option>
-            <option value="H">H – sehr hoch</option>
-          </select>
-        </label>
+      <div class="field-block">
+        <label for="qrText" class="label-title">QR-Text (Ziel) <span class="help-dot" title="Dieser Inhalt wird im QR-Code codiert">?</span></label>
+        <p class="hint">Der Inhalt, der im QR-Code codiert wird.</p>
+        <input id="qrText" type="text" spellcheck="false" autocomplete="off" placeholder="https://support.example.com/object?id=123">
       </div>
 
-      <div class="preview-wrap">
-        <div class="preview-toolbar">
-          <span id="labelInfo">B1 · 40 × 40 mm · 320 × 320 px</span>
-          <span id="renderState">bereit</span>
-        </div>
-        <div id="previewStage" class="preview-stage" style="aspect-ratio: 1 / 1;">
-          <canvas id="labelCanvas" width="320" height="320" aria-label="Labelvorschau"></canvas>
+      <div class="field-block">
+        <label for="caption" class="label-title">Text unter QR (Caption) <span class="help-dot" title="Wird direkt unter dem QR-Code gedruckt">?</span></label>
+        <p class="hint">Wird unter dem QR-Code angezeigt.</p>
+        <input id="caption" type="text" maxlength="120" placeholder="IAM-43322">
+      </div>
+
+      <div class="field-block">
+        <div class="label-line"><label for="captionScale" class="label-title">Caption-Größe</label><output id="captionScaleOut" class="value-chip">Auto</output></div>
+        <p class="hint">Bei QuickChart wird <code>captionFontSize / size</code> übernommen.</p>
+        <input id="captionScale" class="range" type="range" min="0" max="25" step="0.5" value="0">
+      </div>
+
+      <div class="field-block">
+        <span class="label-title">Label-Format</span><p class="hint">Standard ist 40 × 40 mm.</p>
+        <select id="labelSize" class="sr-only" aria-label="Labelformat"><option value="40x40" selected>40 × 40 mm</option><option value="50x30">50 × 30 mm</option></select>
+        <div class="segmented-cards" id="labelSizeCards">
+          <button type="button" class="choice-card active" data-label-size="40x40"><strong>40 × 40 mm</strong><small>quadratisch · Standard</small></button>
+          <button type="button" class="choice-card" data-label-size="50x30"><strong>50 × 30 mm</strong><small>rechteckig · kalibriert</small></button>
         </div>
       </div>
 
-      <div class="primary-actions">
-        <button id="connectBtn" class="btn secondary" type="button">
-          <span class="dot" id="printerDot"></span>
-          <span id="connectLabel">B1 verbinden</span>
-        </button>
-        <button id="printBtn" class="btn primary" type="button" disabled>Drucken</button>
+      <div class="field-block">
+        <label for="ecc" class="label-title">QR-Fehlerkorrektur</label><p class="hint">Höhere Stufe = robuster, aber mehr Module.</p>
+        <select id="ecc"><option value="L">L – klein</option><option value="M" selected>M – normal (Standard)</option><option value="Q">Q – hoch</option><option value="H">H – sehr hoch</option></select>
       </div>
 
-      <div class="secondary-actions">
-        <button id="shareBtn" class="btn ghost" type="button">Teilen</button>
-        <button id="savePngBtn" class="btn ghost" type="button">PNG</button>
-        <button id="savePdfBtn" class="btn ghost" type="button">PDF</button>
-        <button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button>
+      <div class="field-block">
+        <span class="label-title">Render-Modus</span><p class="hint">Erzeuge das Bild offline im Browser oder über die QuickChart API.</p>
+        <select id="renderMode" class="sr-only" aria-label="Render-Modus"><option value="auto">Auto</option><option value="local">Offline lokal</option><option value="quickchart">QuickChart API</option></select>
+        <div class="segmented-cards" id="renderModeCards">
+          <button type="button" class="choice-card active" data-render-mode="local"><strong>Offline (lokal)</strong><small>Im Browser generieren</small></button>
+          <button type="button" class="choice-card" data-render-mode="quickchart"><strong>QuickChart API</strong><small>Original über quickchart.io</small></button>
+        </div>
+        <div id="renderModeInfo" class="inline-status neutral"><span>✓</span><span>Offline-Modus aktiv – funktioniert ohne Internet.</span></div>
       </div>
 
-      <div id="statusBox" class="status info" role="status" aria-live="polite">
-        Bluetooth-Unterstützung wird geprüft …
+      <div class="advanced-row">
+        <label class="compact-field"><span>Dichte</span><input id="density" type="range" min="1" max="5" step="1" value="3"><output id="densityOut">3</output></label>
+        <label class="compact-field"><span>Kopien</span><input id="copies" type="number" min="1" max="20" value="1" inputmode="numeric"></label>
+        <label class="compact-field"><span>Vertikaler Offset</span><input id="offsetY" type="number" min="-60" max="60" value="0" inputmode="numeric"><small>px</small></label>
       </div>
-    </section>
 
-    <section class="card">
-      <details open>
-        <summary>Druckeinstellungen</summary>
-        <div class="settings-grid">
-          <label class="field">
-            <span>Dichte</span>
-            <input id="density" type="range" min="1" max="5" step="1" value="3">
-            <output id="densityOut">3</output>
-          </label>
-          <label class="field">
-            <span>Kopien</span>
-            <input id="copies" type="number" min="1" max="20" value="1" inputmode="numeric">
-          </label>
-          <label class="field">
-            <span>Vertikaler Offset (px)</span>
-            <input id="offsetY" type="number" min="-60" max="60" value="0" inputmode="numeric">
-          </label>
-          <label class="field">
-            <span>Caption-Größe (%) <small>0 = Auto</small></span>
-            <input id="captionScale" type="number" min="0" max="25" step="0.5" value="0" inputmode="decimal">
-          </label>
-          <label class="field">
-            <span>Render-Modus</span>
-            <select id="renderMode">
-              <option value="auto">Auto · QuickChart wenn verfügbar</option>
-              <option value="quickchart">QuickChart API · originalgetreu</option>
-              <option value="local">Offline lokal · ohne Internet</option>
-            </select>
-            <small class="field-help">Bei einem QuickChart-Link wird automatisch die QuickChart API gewählt. Fällt sie aus, rendert die App lokal weiter.</small>
-          </label>
-          <label class="switch-row">
-            <input id="invert" type="checkbox">
-            <span>Schwarz/Weiß invertieren</span>
-          </label>
-        </div>
-      </details>
-    </section>
+      <div class="print-actions">
+        <button id="connectBtn" class="btn secondary" type="button"><span class="dot" id="printerDot"></span><span id="connectLabel">B1 verbinden</span></button>
+        <button id="printBtn" class="btn primary wide" type="button" disabled>Drucken</button>
+      </div>
+      <div class="export-actions"><button id="savePngBtn" class="btn ghost" type="button">Als PNG speichern</button><button id="savePdfBtn" class="btn ghost" type="button">Als PDF speichern</button><button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button><button id="shareBtn" class="btn ghost" type="button">Teilen</button></div>
+      <div id="statusBox" class="status info" role="status" aria-live="polite">Bluetooth-Unterstützung wird geprüft …</div>
+    </article>
 
-    <section class="card">
-      <details>
-        <summary>Vorlagen & Verlauf</summary>
-        <div class="stack">
-          <div class="subhead">
-            <strong>Vorlagen</strong>
-            <button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button>
-          </div>
-          <div id="presetList" class="list empty">Noch keine Vorlagen.</div>
-          <div class="subhead history-head"><strong>Letzte Drucke</strong></div>
-          <div id="historyList" class="list empty">Noch keine Drucke.</div>
-        </div>
-      </details>
-    </section>
+    <article class="panel preview-panel">
+      <div class="preview-heading"><h2>Vorschau (<span id="previewMm">40 × 40 mm</span>)</h2><span id="pixelBadge" class="pixel-badge">320 × 320 px</span></div>
+      <div class="preview-viewport" id="previewViewport">
+        <div id="previewStage" class="preview-stage"><canvas id="labelCanvas" width="320" height="320" aria-label="Labelvorschau"></canvas><div id="safeOverlay" class="safe-overlay hidden"></div><div id="gridOverlay" class="grid-overlay hidden"></div></div>
+      </div>
+      <div class="preview-tools">
+        <div class="zoom-tools"><strong>Zoom</strong><button id="zoomOutBtn" type="button">−</button><button id="zoomInBtn" type="button">+</button><span id="zoomValue">100%</span></div>
+        <button id="gridBtn" type="button" class="tool-btn">▦ Gitter</button><button id="safeBtn" type="button" class="tool-btn">◯ Sicherheitsrand</button><button id="invertBtn" type="button" class="tool-btn">◐ Invers</button>
+        <input id="invert" type="checkbox" class="sr-only">
+      </div>
+      <div id="captionStatus" class="inline-status neutral"><span>✓</span><span>Vorschau bereit.</span></div>
+      <div class="meta-line"><span id="labelInfo">B1 · 40 × 40 mm · 320 × 320 px</span><span id="renderState">bereit</span></div>
 
-    <section class="card">
-      <details>
-        <summary>Setup, Daten & Update</summary>
-        <div class="stack">
-          <div class="mode-picker">
-            <div>
-              <strong>Betriebsmodus</strong>
-              <p>Der Druck läuft in beiden Modi direkt vom Browser zum Drucker.</p>
-            </div>
-            <label><input type="radio" name="mode" value="local" checked> Lokal</label>
-            <label><input type="radio" name="mode" value="server"> Server</label>
-          </div>
+      <details id="paramsDetails" class="info-details" open><summary>Parameter (aus deinem Link übernommen)</summary><div class="param-table" id="paramTable"><div><span>QR-Text (text)</span><strong id="paramText">–</strong></div><div><span>Caption (caption)</span><strong id="paramCaption">–</strong></div><div><span>Caption Font Size</span><strong id="paramCaptionSize">–</strong></div><div><span>QR Size (size)</span><strong id="paramSize">–</strong></div><div><span>Fehlerkorrektur</span><strong id="paramEcc">M</strong></div><div><span>Render-Modus</span><strong id="paramRenderMode">Offline lokal</strong></div></div></details>
+      <details class="info-details"><summary>So funktioniert es</summary><div class="help-copy"><p><strong>Offline:</strong> schnell, privat und ohne Internet. QR und Caption werden lokal gerendert.</p><p><strong>QuickChart API:</strong> verwendet QuickCharts eigenes Bild und damit dessen Caption-Layout. Benötigt Internet.</p><p>Drucken, PNG und PDF verwenden immer genau die aktuell gerenderte Vorschau.</p></div></details>
+    </article>
+  </section>
 
-          <div id="serverSettings" class="server-settings hidden">
-            <label class="field">
-              <span>Backend URL</span>
-              <input id="backendUrl" type="url" placeholder="https://api.example.com">
-            </label>
-            <label class="field">
-              <span>Cloudflare Client ID <small>optional</small></span>
-              <input id="cfClientId" type="text" autocomplete="off">
-            </label>
-            <label class="field">
-              <span>Cloudflare Client Secret <small>nur lokal gespeichert</small></span>
-              <input id="cfClientSecret" type="password" autocomplete="new-password">
-            </label>
-            <div class="row">
-              <button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button>
-              <button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button>
-              <button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button>
-            </div>
-          </div>
-
-          <div class="data-actions">
-            <button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button>
-            <label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label>
-          </div>
-
-          <div class="update-box">
-            <div>
-              <strong>App-Version</strong>
-              <div id="updateStatus">v7 · wird geprüft</div>
-            </div>
-            <button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button>
-          </div>
-
-          <p class="privacy-note">
-            Lokale Daten liegen nur auf diesem Gerät. Beim Löschen der Website-Daten, Entfernen der App oder Verlust des Geräts können sie verloren gehen. Zugangsdaten und Cloudflare-Secrets werden niemals in Backups exportiert.
-          </p>
-        </div>
-      </details>
-    </section>
-
-    <section class="card support-card">
-      <details>
-        <summary>iPhone / iPad</summary>
-        <div class="stack">
-          <p><strong>Safari und Chrome auf iOS stellen Web Bluetooth nicht bereit.</strong> Zum direkten Druck wird ein Web-BLE-Browser wie Bluefy benötigt.</p>
-          <ol>
-            <li>Bluefy aus dem App Store installieren.</li>
-            <li>Bluetooth für Bluefy erlauben und Bluetooth am Gerät einschalten.</li>
-            <li>Diese HTTPS-Seite direkt in Bluefy öffnen.</li>
-            <li>B1 einschalten, „B1 verbinden“ antippen und im Bluetooth-Dialog auswählen.</li>
-            <li>QR-Code erzeugen und „Drucken“ antippen.</li>
-          </ol>
-          <p class="muted">Der Open-Source-Treiber wurde auf iPhone + Bluefy mit B1 Pro getestet. Der normale B1 nutzt denselben Web-Bluetooth-Verbindungsweg, ist aber in dieser speziellen iOS-Kombination als Hardware-Testpunkt markiert.</p>
-        </div>
-      </details>
-    </section>
-  </main>
-
-  <footer>
-    <span>QR Label v7</span>
-    <span id="onlineState">online</span>
-  </footer>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-  <!-- Pinned third-party libraries. The service worker caches these after a successful online load. -->
-  <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
-  <script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script>
-  <script src="./storage.js?v=7" defer></script>
-  <script src="./providers.js?v=7" defer></script>
-  <script src="./printer.js?v=7" defer></script>
-  <script src="./app.js?v=7" defer></script>
-</body>
-</html>
+  <section id="settingsSection" class="below-grid">
+    <article class="panel"><details><summary>Vorlagen & Verlauf</summary><div class="stack"><div class="subhead"><strong>Vorlagen</strong><button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button></div><div id="presetList" class="list empty">Noch keine Vorlagen.</div><div class="subhead history-head"><strong>Letzte Drucke</strong></div><div id="historyList" class="list empty">Noch keine Drucke.</div></div></details></article>
+    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v8 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
+  </section>
+</main>
+<footer><span>QR Label v8</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=8" defer></script><script src="./providers.js?v=8" defer></script><script src="./printer.js?v=8" defer></script><script src="./app.js?v=8" defer></script>
+</body></html>

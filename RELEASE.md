@@ -1,15 +1,18 @@
-# Release v7
+# Release v8
 
-Kompatibel mit Docker v7.
+Kompatibel mit Docker v8.
 
-## Änderungen v7
+## Änderungen v8
 
-- Zwei Renderwege: **QuickChart API** und **Offline lokal**.
-- Beim Einfügen eines QuickChart-QR-Links wird automatisch der QuickChart-API-Modus gewählt.
-- QuickChart rendert das Originalbild inklusive `caption`, `captionFontSize`, `margin`, Fehlerkorrektur und unterstützten Stilparametern; das fertige Bild wird auf das aktuelle Label skaliert.
-- Bei Netzwerk-/CORS-/Timeout-Fehlern fällt die App automatisch auf den lokalen Renderer zurück.
-- Lokaler Renderer positioniert die Caption deutlich näher am QR-Code und bleibt vollständig offline nutzbar.
-- Drucken, PNG und PDF warten auf den aktuellen Renderer und verwenden exakt die sichtbare Vorschau.
-- QuickChart-Requests haben Timeout und einen kleinen In-Memory-Cache, um unnötige Wiederholungen zu vermeiden.
-- Service-Worker-Cache `qr-label-pwa-v7`, lokale Assets mit `?v=7`.
-- 40×40 mm bleibt Standard.
+- Tablet-first Zweispalten-UI: Einstellungen links, große Vorschau rechts; iPhone automatisch einspaltig.
+- Quelle/QuickChart-Link und tatsächliches QR-Ziel sind getrennt, damit der Original-Link erhalten bleibt.
+- QuickChart-Importstatus mit Parameteranzeige.
+- Caption-Größe als Slider; QuickChart `captionFontSize / size` wird automatisch übernommen.
+- 40×40 mm bleibt Standard; 50×30 mm als zweite Formatkarte.
+- Zwei klare Renderwege: Offline lokal oder QuickChart API.
+- QuickChart API verwendet das von QuickChart gerenderte Bild inkl. Caption-Layout.
+- Offline-Renderer mit engerer Caption-Positionierung.
+- Vorschauwerkzeuge: Zoom, Gitter, Sicherheitsrand und Invert.
+- Parameter-Tabelle zeigt QR-Ziel, Caption, Caption-Größe, QuickChart-Größe, Fehlerkorrektur und aktiven Renderer.
+- Drucken, PNG und PDF verwenden weiterhin exakt den aktuell gerenderten Canvas.
+- Service-Worker-Cache und Asset-Version auf v8 erhöht.
