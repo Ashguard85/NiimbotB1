@@ -10,10 +10,10 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="manifest" href="./manifest.webmanifest?v=5">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./app.css?v=5">
 </head>
 <body>
   <header class="topbar">
@@ -31,7 +31,7 @@
           <h2 id="editorTitle">Label</h2>
           <p>QR-Code lokal erzeugen und direkt per Bluetooth drucken.</p>
         </div>
-        <span id="appVersion" class="version">v4</span>
+        <span id="appVersion" class="version">v5</span>
       </div>
 
       <label class="field">
@@ -48,8 +48,8 @@
         <label class="field">
           <span>Labelformat</span>
           <select id="labelSize">
+            <option value="40x40" selected>40 × 40 mm · Standard · abgeleitet</option>
             <option value="50x30">50 × 30 mm · kalibriert</option>
-            <option value="40x40">40 × 40 mm · abgeleitet</option>
           </select>
         </label>
         <label class="field">
@@ -65,10 +65,10 @@
 
       <div class="preview-wrap">
         <div class="preview-toolbar">
-          <span id="labelInfo">B1 · 50 × 30 mm · 384 × 240 px</span>
+          <span id="labelInfo">B1 · 40 × 40 mm · 320 × 320 px</span>
           <span id="renderState">bereit</span>
         </div>
-        <canvas id="labelCanvas" width="384" height="240" aria-label="Labelvorschau"></canvas>
+        <canvas id="labelCanvas" width="320" height="320" aria-label="Labelvorschau"></canvas>
       </div>
 
       <div class="primary-actions">
@@ -82,6 +82,7 @@
       <div class="secondary-actions">
         <button id="shareBtn" class="btn ghost" type="button">Teilen</button>
         <button id="savePngBtn" class="btn ghost" type="button">PNG</button>
+        <button id="savePdfBtn" class="btn ghost" type="button">PDF</button>
         <button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button>
       </div>
 
@@ -105,7 +106,7 @@
           </label>
           <label class="field">
             <span>Vertikaler Offset (px)</span>
-            <input id="offsetY" type="number" min="-60" max="60" value="4" inputmode="numeric">
+            <input id="offsetY" type="number" min="-60" max="60" value="0" inputmode="numeric">
           </label>
           <label class="field">
             <span>Caption-Größe (%) <small>0 = Auto</small></span>
@@ -175,7 +176,7 @@
           <div class="update-box">
             <div>
               <strong>App-Version</strong>
-              <div id="updateStatus">v4 · wird geprüft</div>
+              <div id="updateStatus">v5 · wird geprüft</div>
             </div>
             <button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button>
           </div>
@@ -206,7 +207,7 @@
   </main>
 
   <footer>
-    <span>QR Label v4</span>
+    <span>QR Label v5</span>
     <span id="onlineState">online</span>
   </footer>
 
@@ -215,9 +216,9 @@
   <!-- Pinned third-party libraries. The service worker caches these after a successful online load. -->
   <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
   <script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script>
-  <script src="./storage.js" defer></script>
-  <script src="./providers.js" defer></script>
-  <script src="./printer.js" defer></script>
-  <script src="./app.js" defer></script>
+  <script src="./storage.js?v=5" defer></script>
+  <script src="./providers.js?v=5" defer></script>
+  <script src="./printer.js?v=5" defer></script>
+  <script src="./app.js?v=5" defer></script>
 </body>
 </html>

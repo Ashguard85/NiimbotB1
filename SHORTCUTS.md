@@ -1,4 +1,4 @@
-# Apple Kurzbefehle / URL-API – v4
+# Apple Kurzbefehle / URL-API – v5
 
 ## Direkter QR-Inhalt
 

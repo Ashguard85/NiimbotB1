@@ -1,9 +1,9 @@
 "use strict";
-const CACHE_VERSION = "qr-label-pwa-v4";
+const CACHE_VERSION = "qr-label-pwa-v5";
 const CACHE = CACHE_VERSION;
 const APP_SHELL = [
-  "./","./index.html","./app.css","./app.js","./storage.js","./providers.js","./printer.js",
-  "./manifest.webmanifest","./offline.html",
+  "./","./index.html","./app.css?v=5","./app.js?v=5","./storage.js?v=5","./providers.js?v=5","./printer.js?v=5",
+  "./manifest.webmanifest?v=5","./offline.html",
   "./icons/favicon.png","./icons/apple-touch-icon.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png"
 ];
 const VENDOR = [

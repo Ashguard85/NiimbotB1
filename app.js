@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "4";
+  const APP_VERSION = "5";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -16,7 +16,7 @@
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
-  const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"50x30":1,"40x40":1}));
+  const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"40x40":1,"50x30":1}));
 
   function toast(msg) {
     els.toast.textContent = msg;
@@ -251,7 +251,7 @@
   }
 
   function setLabelSize(key, {persist=true, resetOffset=true}={}) {
-    if (!validLabelSizes.has(key)) key="50x30";
+    if (!validLabelSizes.has(key)) key="40x40";
     els.labelSize.value=key;
     activePrinter=B1Printer.setSize(key);
     if (persist) LocalStore.setSetting("labelSize",key);
@@ -290,6 +290,68 @@
   async function canvasBlob() {
     render(true);
     return new Promise((resolve,reject)=>els.labelCanvas.toBlob(b=>b?resolve(b):reject(new Error("PNG konnte nicht erstellt werden.")),"image/png"));
+  }
+
+  function asciiBytes(text) { return new TextEncoder().encode(text); }
+
+  function concatBytes(parts) {
+    const total=parts.reduce((n,p)=>n+p.length,0);
+    const out=new Uint8Array(total); let offset=0;
+    for(const part of parts){ out.set(part,offset); offset+=part.length; }
+    return out;
+  }
+
+  function pdfBlobFromCanvas() {
+    render(true);
+    const c=els.labelCanvas;
+    const ctx=c.getContext("2d",{alpha:false});
+    const rgba=ctx.getImageData(0,0,c.width,c.height).data;
+    const rgb=new Uint8Array(c.width*c.height*3);
+    for(let i=0,j=0;i<rgba.length;i+=4){
+      const a=rgba[i+3]/255;
+      rgb[j++]=Math.round(rgba[i]*a+255*(1-a));
+      rgb[j++]=Math.round(rgba[i+1]*a+255*(1-a));
+      rgb[j++]=Math.round(rgba[i+2]*a+255*(1-a));
+    }
+
+    const g=printerGeometry().size;
+    const wPt=(Number(g.w_mm)*72/25.4);
+    const hPt=(Number(g.h_mm)*72/25.4);
+    const pageW=wPt.toFixed(4), pageH=hPt.toFixed(4);
+    const content=asciiBytes(`q\n${pageW} 0 0 ${pageH} 0 0 cm\n/Im0 Do\nQ\n`);
+    const objects=[
+      asciiBytes("<< /Type /Catalog /Pages 2 0 R >>"),
+      asciiBytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"),
+      asciiBytes(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>`),
+      concatBytes([asciiBytes(`<< /Length ${content.length} >>\nstream\n`),content,asciiBytes("endstream")]),
+      concatBytes([asciiBytes(`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length ${rgb.length} >>\nstream\n`),rgb,asciiBytes("\nendstream")])
+    ];
+
+    const parts=[asciiBytes("%PDF-1.4\n%QRLabel\n")];
+    const offsets=[0]; let pos=parts[0].length;
+    objects.forEach((obj,idx)=>{
+      offsets[idx+1]=pos;
+      const head=asciiBytes(`${idx+1} 0 obj\n`), tail=asciiBytes("\nendobj\n");
+      parts.push(head,obj,tail); pos+=head.length+obj.length+tail.length;
+    });
+    const xrefPos=pos;
+    let xref=`xref\n0 ${objects.length+1}\n0000000000 65535 f \n`;
+    for(let i=1;i<=objects.length;i++) xref+=`${String(offsets[i]).padStart(10,"0")} 00000 n \n`;
+    xref+=`trailer\n<< /Size ${objects.length+1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF\n`;
+    parts.push(asciiBytes(xref));
+    return new Blob([concatBytes(parts)],{type:"application/pdf"});
+  }
+
+  async function savePdf() {
+    try {
+      const blob=pdfBlobFromCanvas();
+      const name=`qr-label-${els.labelSize.value}.pdf`;
+      const file=new File([blob],name,{type:"application/pdf"});
+      if(navigator.canShare && navigator.canShare({files:[file]})) {
+        await navigator.share({files:[file],title:`QR Label ${printerGeometry().size.w_mm}×${printerGeometry().size.h_mm} mm`});
+      } else downloadBlob(blob,name);
+      toast(`PDF ${printerGeometry().size.w_mm}×${printerGeometry().size.h_mm} mm bereit`);
+    } catch(e) { if(e.name!=="AbortError") status("PDF konnte nicht erstellt werden: "+e.message,"error"); }
   }
 
   async function connectPrinter() {
@@ -509,7 +571,7 @@
 
   async function init() {
     ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","labelSize","ecc","labelCanvas","labelInfo","renderState",
-     "density","densityOut","copies","offsetY","captionScale","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn",
+     "density","densityOut","copies","offsetY","captionScale","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     els.appVersion.textContent="v"+APP_VERSION;
@@ -518,8 +580,15 @@
     els.density.value=await LocalStore.getSetting("density",3); els.densityOut.value=els.density.value;
     els.copies.value=await LocalStore.getSetting("copies",1);
     els.captionScale.value=await LocalStore.getSetting("captionScale",0);
-    const savedSize=await LocalStore.getSetting("labelSize","50x30");
-    setLabelSize(validLabelSizes.has(savedSize)?savedSize:"50x30",{persist:false,resetOffset:false});
+    const defaultSizeRevision=await LocalStore.getSetting("defaultLabelSizeRevision",0);
+    let savedSize=await LocalStore.getSetting("labelSize","40x40");
+    if (Number(defaultSizeRevision) < 5) {
+      savedSize="40x40";
+      await LocalStore.setSetting("labelSize",savedSize);
+      await LocalStore.setSetting("defaultLabelSizeRevision",5);
+      await LocalStore.setSetting("offsetY",B1Printer.LABEL_PRESETS["40x40"].sizes[4096].offset_y_px ?? 0);
+    }
+    setLabelSize(validLabelSizes.has(savedSize)?savedSize:"40x40",{persist:false,resetOffset:false});
     els.offsetY.value=await LocalStore.getSetting("offsetY",printerGeometry().size.offset_y_px ?? 0);
     await loadProvider();
 
@@ -537,6 +606,7 @@
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",sharePng);
     els.savePngBtn.addEventListener("click",async()=>downloadBlob(await canvasBlob(),`qr-label-${els.labelSize.value}.png`));
+    els.savePdfBtn.addEventListener("click",savePdf);
     els.savePresetBtn.addEventListener("click",savePreset);
     els.refreshItemsBtn.addEventListener("click",refreshLists);
     document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener("change",()=>changeMode(r.value)));

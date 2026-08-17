@@ -1,6 +1,6 @@
-# Release v4
+# Release v5
 
-Kompatibel mit Docker v4.
+Kompatibel mit Docker v5.
 
 ## Neu
 - Labelformate `50x30` und `40x40` auswählbar.
@@ -12,7 +12,13 @@ Kompatibel mit Docker v4.
 - Vorlagen und Druckhistorie speichern das Labelformat; Vorlagen speichern zusätzlich die Caption-Skalierung.
 - Backup-Format v2; Restore akzeptiert v1 und v2.
 - SQLite-Schema v2 migriert bestehende Daten automatisch um `label_size` und `caption_scale`.
-- Service-Worker-Cache `qr-label-pwa-v4`.
+- Service-Worker-Cache `qr-label-pwa-v5`.
 
 ## Hardware-Hinweis
 `40x40` ist in diesem Projekt eine berechnete Geometrie und wurde in dieser Umgebung nicht auf echter B1/B1-Pro-Hardware kalibriert. Vor produktiver Nutzung einen Testdruck machen und bei Bedarf den vertikalen Offset korrigieren.
+
+
+## Änderungen v5
+- **40×40 mm ist ab v5 der Standard** für neue Labels und wird beim ersten Start von v5 einmalig als aktive Standardgröße gesetzt. Gespeicherte Vorlagen behalten ihr eigenes Labelformat.
+- Neuer **PDF-Export**. Die PDF-Seite besitzt exakt die physische Größe des aktuell gewählten Labels (standardmäßig 40×40 mm), nicht A4/Letter.
+- Lokale Frontend-Assets tragen `?v=5`, damit ein alter Service Worker nach einem Deployment nicht weiter unbemerkt v3/v4-JavaScript ausliefert.

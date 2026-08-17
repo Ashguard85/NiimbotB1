@@ -32,14 +32,14 @@
 
   const chooserModel = { id:4096, name_prefixes:["B1"], task:"b1", density:3, label_type:1, speed:1, dpi:203 };
   let activeModel = MODELS[4096];
-  let activeSizeKey = "50x30";
+  let activeSizeKey = "40x40";
 
   function supported() {
     return !!(window.Niimbot && typeof Niimbot.isSupported === "function" && Niimbot.isSupported());
   }
 
   function geometry(modelId=activeModel.id, key=activeSizeKey) {
-    const preset = LABEL_PRESETS[key] || LABEL_PRESETS["50x30"];
+    const preset = LABEL_PRESETS[key] || LABEL_PRESETS["40x40"];
     const size = preset.sizes[modelId] || preset.sizes[4096];
     return {...size};
   }
@@ -60,7 +60,7 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v4 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v5 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     activeModel = MODELS[id];
     if (activeModel.id === 4096 && "PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
