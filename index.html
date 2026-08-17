@@ -10,10 +10,10 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=5">
+  <link rel="manifest" href="./manifest.webmanifest?v=6">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=5">
+  <link rel="stylesheet" href="./app.css?v=6">
 </head>
 <body>
   <header class="topbar">
@@ -31,13 +31,13 @@
           <h2 id="editorTitle">Label</h2>
           <p>QR-Code lokal erzeugen und direkt per Bluetooth drucken.</p>
         </div>
-        <span id="appVersion" class="version">v5</span>
+        <span id="appVersion" class="version">v6</span>
       </div>
 
       <label class="field">
         <span>QR-Inhalt oder QuickChart-Link <small>ein Feld genügt</small></span>
         <textarea id="qrText" rows="3" maxlength="5000" spellcheck="false" placeholder="Ziel-URL oder https://quickchart.io/qr?text=...&caption=..."></textarea>
-        <small class="field-help">Beim Einfügen eines QuickChart-QR-Links werden QR-Ziel, Caption, Fehlerkorrektur und Caption-Größe automatisch übernommen.</small>
+        <small class="field-help">QuickChart-Link oder auch nur <code>text=…&amp;caption=…</code> einfügen: QR-Ziel, Caption, Fehlerkorrektur und Caption-Größe werden automatisch übernommen.</small>
       </label>
 
       <div class="three-col">
@@ -68,7 +68,9 @@
           <span id="labelInfo">B1 · 40 × 40 mm · 320 × 320 px</span>
           <span id="renderState">bereit</span>
         </div>
-        <canvas id="labelCanvas" width="320" height="320" aria-label="Labelvorschau"></canvas>
+        <div id="previewStage" class="preview-stage" style="aspect-ratio: 1 / 1;">
+          <canvas id="labelCanvas" width="320" height="320" aria-label="Labelvorschau"></canvas>
+        </div>
       </div>
 
       <div class="primary-actions">
@@ -176,7 +178,7 @@
           <div class="update-box">
             <div>
               <strong>App-Version</strong>
-              <div id="updateStatus">v5 · wird geprüft</div>
+              <div id="updateStatus">v6 · wird geprüft</div>
             </div>
             <button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button>
           </div>
@@ -207,7 +209,7 @@
   </main>
 
   <footer>
-    <span>QR Label v5</span>
+    <span>QR Label v6</span>
     <span id="onlineState">online</span>
   </footer>
 
@@ -216,9 +218,9 @@
   <!-- Pinned third-party libraries. The service worker caches these after a successful online load. -->
   <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script>
   <script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script>
-  <script src="./storage.js?v=5" defer></script>
-  <script src="./providers.js?v=5" defer></script>
-  <script src="./printer.js?v=5" defer></script>
-  <script src="./app.js?v=5" defer></script>
+  <script src="./storage.js?v=6" defer></script>
+  <script src="./providers.js?v=6" defer></script>
+  <script src="./printer.js?v=6" defer></script>
+  <script src="./app.js?v=6" defer></script>
 </body>
 </html>

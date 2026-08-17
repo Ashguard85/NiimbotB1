@@ -1,4 +1,4 @@
-# QR Label – Pages v5
+# QR Label – Pages v6
 
 Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels auf NIIMBOT B1/B1 Pro via Web Bluetooth. Für den Druck ist kein Backend notwendig.
 
@@ -8,7 +8,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 - Labelformate `50×30 mm` und `40×40 mm`.
 - B1/B1-Pro-Autoerkennung.
 - Direktdruck über Web Bluetooth, Dichte/Kopien/Offset, PNG/Share-Fallback.
-- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v5-Server-Provider.
+- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v6-Server-Provider.
 - Offline-App-Shell und kontrollierte Service-Worker-Updates.
 
 ## QuickChart-Beispiel
@@ -47,7 +47,7 @@ In Chrome/Edge die HTTPS-Seite öffnen, Bluetooth erlauben, B1 verbinden und dru
 
 ## Datenmodi
 - **Lokal:** IndexedDB, kein Backend erforderlich.
-- **Server:** HTTPS-API zu Docker v5; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
+- **Server:** HTTPS-API zu Docker v6; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
 - Kein Fake-Sync. Ein Moduswechsel wechselt nur den aktiven Datenspeicher.
 
 ## Backup
@@ -64,7 +64,7 @@ Restore akzeptiert v1 und v2. Cloudflare-Zugangsdaten werden nie exportiert.
 Siehe `SHORTCUTS.md`. Neu: `quickchart=`/`source=`, `label=40x40` und `captionpct=`.
 
 ## Update-Lifecycle
-Service-Worker-Cache: `qr-label-pwa-v5`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
+Service-Worker-Cache: `qr-label-pwa-v6`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
 
 ## Bekannte Grenzen
 - Direkter iOS-Druck braucht Bluefy oder einen anderen Web-BLE-Browser.
@@ -73,4 +73,4 @@ Service-Worker-Cache: `qr-label-pwa-v5`. Neue Versionen werden vorbereitet und n
 
 
 ## Standardformat und PDF
-Ab v5 startet die App mit **40×40 mm**. Der Button **PDF** erzeugt eine einseitige PDF mit exakt der aktuell gewählten Labelgröße; bei der Standardeinstellung also 40×40 mm. Beim Wechsel auf 50×30 wird entsprechend eine 50×30-mm-PDF erzeugt.
+Ab v6 startet die App mit **40×40 mm**. Der Button **PDF** erzeugt eine einseitige PDF mit exakt der aktuell gewählten Labelgröße; bei der Standardeinstellung also 40×40 mm. Beim Wechsel auf 50×30 wird entsprechend eine 50×30-mm-PDF erzeugt.

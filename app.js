@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "5";
+  const APP_VERSION = "6";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -13,6 +13,7 @@
   let shortcutAutoprint = false;
   let shortcutNotice = "";
   let quickChartReferenceSize = 0;
+  let quickChartDetectTimer;
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const now = () => new Date().toISOString();
@@ -80,6 +81,7 @@
       if (c.width !== p.size.w_px || c.height !== p.size.h_px) {
         c.width = p.size.w_px; c.height = p.size.h_px;
         c.style.aspectRatio = `${p.size.w_px} / ${p.size.h_px}`;
+        if (els.previewStage) els.previewStage.style.aspectRatio = `${p.size.w_px} / ${p.size.h_px}`;
       }
       updateGeometryUi();
       const ctx = c.getContext("2d", {alpha:false});
@@ -141,17 +143,34 @@
     if (immediate) draw(); else renderTimer = setTimeout(draw, 60);
   }
 
-  function isQuickChartQrUrl(value) {
+  function quickChartParams(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+
+    // Vollständige QuickChart-URL, auch ohne explizites https:// akzeptieren.
+    let candidate = raw;
+    if (/^(?:www\.)?quickchart\.io\/qr\?/i.test(candidate)) candidate = "https://" + candidate;
     try {
-      const u = new URL(String(value).trim());
-      return /(^|\.)quickchart\.io$/i.test(u.hostname) && /^\/qr\/?$/i.test(u.pathname);
-    } catch (_) { return false; }
+      const u = new URL(candidate);
+      if (/(^|\.)quickchart\.io$/i.test(u.hostname) && /^\/qr\/?$/i.test(u.pathname)) return u.searchParams;
+    } catch (_) {}
+
+    // Bluefy/iOS kann beim Einfügen bzw. Teilen auch nur den Query-Teil liefern.
+    // Beispiel: text=https://...&size=500&caption=IAM-43322&captionFontSize=40
+    const query = raw.replace(/^[?#]/, "");
+    if (/^text=/i.test(query) && /(?:^|&)(?:caption|captionFontSize|size|ecLevel|ecc)=/i.test(query)) {
+      return new URLSearchParams(query);
+    }
+    return null;
+  }
+
+  function isQuickChartQrUrl(value) {
+    return quickChartParams(value) !== null;
   }
 
   function parseQuickChart(value) {
-    if (!isQuickChartQrUrl(value)) return null;
-    const u = new URL(String(value).trim());
-    const p = u.searchParams;
+    const p = quickChartParams(value);
+    if (!p) return null;
     const text = p.get("text");
     if (!text) throw new Error("QuickChart-Link enthält keinen text=-Parameter.");
     const caption = p.get("caption");
@@ -570,7 +589,7 @@
   }
 
   async function init() {
-    ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","labelSize","ecc","labelCanvas","labelInfo","renderState",
+    ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","qrText","caption","labelSize","ecc","previewStage","labelCanvas","labelInfo","renderState",
      "density","densityOut","copies","offsetY","captionScale","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
@@ -593,9 +612,17 @@
     await loadProvider();
 
     ["qrText","caption","ecc","invert","captionScale"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; render(); }));
-    els.qrText.addEventListener("input",()=>LocalStore.setSetting("draftQr",els.qrText.value));
-    els.qrText.addEventListener("paste",()=>setTimeout(()=>importQuickChartFromValue(els.qrText.value,{announce:true}),0));
-    els.qrText.addEventListener("change",()=>importQuickChartFromValue(els.qrText.value,{announce:true}));
+    const detectQuickChart = () => {
+      LocalStore.setSetting("draftQr",els.qrText.value);
+      clearTimeout(quickChartDetectTimer);
+      quickChartDetectTimer = setTimeout(() => {
+        if (isQuickChartQrUrl(els.qrText.value)) importQuickChartFromValue(els.qrText.value,{announce:true});
+      }, 80);
+    };
+    // Bluefy/iOS meldet Einfügen teils nur als input, nicht zuverlässig als paste.
+    els.qrText.addEventListener("input",detectQuickChart);
+    els.qrText.addEventListener("paste",()=>setTimeout(detectQuickChart,0));
+    els.qrText.addEventListener("change",detectQuickChart);
     els.caption.addEventListener("input",()=>LocalStore.setSetting("draftCaption",els.caption.value));
     els.captionScale.addEventListener("change",()=>LocalStore.setSetting("captionScale",Number(els.captionScale.value)||0));
     els.labelSize.addEventListener("change",()=>setLabelSize(els.labelSize.value,{persist:true,resetOffset:true}));

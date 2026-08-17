@@ -60,7 +60,7 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v5 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v6 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     activeModel = MODELS[id];
     if (activeModel.id === 4096 && "PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
