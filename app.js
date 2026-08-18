@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "19";
+  const APP_VERSION = "20";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -755,8 +755,14 @@
 
   async function connectPrinter() {
     try {
-      els.connectBtn.disabled=true; status("Bluetooth-Gerät auswählen …","info");
-      activePrinter=await B1Printer.connect();
+      els.connectBtn.disabled=true; status("Bluetooth-Verbindung wird vorbereitet …","info");
+      activePrinter=await B1Printer.connect({onStage:(ev)=>{
+        if(!ev || !ev.stage) return;
+        if(ev.stage==="chooser") status("beacio-Geräteauswahl geöffnet – bitte den NIIMBOT auswählen …","info");
+        else if(ev.stage==="selected") status(`Gerät gewählt: ${ev.detail || "Bluetooth-Gerät"}. NIIMBOT-Kompatibilität wird geprüft …`,"info");
+        else if(ev.stage==="identify") status("NIIMBOT-Treiber wird vorbereitet …","info");
+        else if(ev.stage==="identified") status("NIIMBOT erkannt – Verbindung wird abgeschlossen …","info");
+      }});
       activePrinter=B1Printer.setSize(els.labelSize.value);
       setConnected(true, activePrinter.name.replace("NIIMBOT ","")+" verbunden");
       updateGeometryUi({resetOffset:false});

@@ -54,11 +54,67 @@
     return current();
   }
 
-  async function connect() {
+  function isIOS() {
+    const ua = navigator.userAgent || "";
+    return /iPad|iPhone|iPod/i.test(ua) ||
+      (navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+
+  function isBluefy() {
+    return !!window.BLENative;
+  }
+
+  function shouldUseNeutralChooser() {
+    // Safari + beacio exposes navigator.bluetooth but not Bluefy's BLENative bridge.
+    // In this environment a restrictive NIIMBOT name/service filter may cause the
+    // chooser to stall even though beacio itself can see the printer.
+    return isIOS() && !isBluefy() && !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
+  }
+
+  function installRequestDeviceOverride(onStage) {
+    if (!shouldUseNeutralChooser()) return () => {};
+    const bt = navigator.bluetooth;
+    const original = bt.requestDevice;
+    if (typeof original !== "function") return () => {};
+
+    const neutral = async function(options = {}) {
+      const optionalServices = Array.isArray(options.optionalServices) ? options.optionalServices : [];
+      onStage?.({ stage:"chooser", detail:"Neutraler beacio-Gerätewähler geöffnet" });
+      const device = await original.call(bt, {
+        acceptAllDevices: true,
+        ...(optionalServices.length ? { optionalServices } : {})
+      });
+      onStage?.({ stage:"selected", detail: device?.name || "Bluetooth-Gerät gewählt", device });
+      return device;
+    };
+
+    let restored = false;
+    try { bt.requestDevice = neutral; } catch (_) {}
+    if (bt.requestDevice !== neutral) {
+      try { Object.defineProperty(bt, "requestDevice", { configurable:true, writable:true, value:neutral }); } catch (_) {}
+    }
+    if (bt.requestDevice !== neutral) throw new Error("beacio-Gerätewähler konnte nicht aktiviert werden.");
+
+    return () => {
+      if (restored) return; restored = true;
+      try { bt.requestDevice = original; } catch (_) {}
+      if (bt.requestDevice !== original) {
+        try { Object.defineProperty(bt, "requestDevice", { configurable:true, writable:true, value:original }); } catch (_) {}
+      }
+    };
+  }
+
+  async function connect(opts={}) {
     if (!window.Niimbot) throw new Error("NIIMBOT-Treiber wurde nicht geladen.");
     if (!supported()) throw new Error("Dieser Browser stellt kein Web Bluetooth bereit.");
-    const info = await Niimbot.identify(chooserModel);
-    const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
+    const onStage = typeof opts.onStage === "function" ? opts.onStage : null;
+    let restoreChooser = () => {};
+    try {
+      restoreChooser = installRequestDeviceOverride(onStage);
+      onStage?.({ stage:"identify", detail:"NIIMBOT-Erkennung wird gestartet" });
+      const info = await Niimbot.identify(chooserModel);
+      onStage?.({ stage:"identified", detail:"NIIMBOT-Gerät erkannt", info });
+      const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
       throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
@@ -67,9 +123,7 @@
     // B1 + iOS/CoreBluetooth: use the driver's conservative transport settings.
     // The upstream driver documents that CoreBluetooth may cap unacknowledged
     // writes around 182 bytes; B1 frame bundling defaults to 240 bytes.
-    const ua = navigator.userAgent || "";
-    const ios = /iPad|iPhone|iPod/i.test(ua) ||
-      (navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+    const ios = isIOS();
     if (activeModel.id === 4096) {
       if ("PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
       if (ios) {
@@ -77,7 +131,11 @@
         if ("BUNDLE_MAX" in Niimbot) Niimbot.BUNDLE_MAX = 180;
       }
     }
-    return current();
+      onStage?.({ stage:"connected", detail:`${activeModel.name} verbunden`, printer:current() });
+      return current();
+    } finally {
+      restoreChooser();
+    }
   }
 
   function installGlobalOverride(name, value) {
