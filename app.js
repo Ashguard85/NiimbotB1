@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "13";
+  const APP_VERSION = "14";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -37,6 +37,7 @@
   const handledHandoffs = new Set();
   const pendingHandoffAcks = new Map();
   let handoffChannel = null;
+  const swHandoffWaiters = new Map();
 
   const now = () => new Date().toISOString();
   const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"40x40":1,"50x30":1}));
@@ -58,6 +59,7 @@
     els.printerDot.classList.toggle("ok", on);
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
+    registerHandoffReceiverWithSW().catch(()=>{});
   }
 
   function printerGeometry() {
@@ -876,6 +878,27 @@
     return ["1","true","yes","ja","on"].includes(String(value||"").toLowerCase());
   }
 
+  async function handoffServiceWorker() {
+    if (!("serviceWorker" in navigator)) return null;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      return navigator.serviceWorker.controller || reg.active || null;
+    } catch (_) { return null; }
+  }
+
+  async function registerHandoffReceiverWithSW() {
+    const sw = await handoffServiceWorker();
+    if (!sw) return false;
+    sw.postMessage({type:"HANDOFF_REGISTER",tabId:handoffTabId,connected:!!connected,ts:Date.now()});
+    return true;
+  }
+
+  function receiveSWHandoffResult(message) {
+    if (!message || message.type!=="HANDOFF_RESULT" || !message.requestId) return;
+    const resolve=swHandoffWaiters.get(message.requestId);
+    if (resolve) { swHandoffWaiters.delete(message.requestId); resolve(!!message.ok); }
+  }
+
   function handoffPayloadFromParams(params) {
     const copy = new URLSearchParams(params);
     copy.delete("handoff");
@@ -902,6 +925,12 @@
       }
     } finally {
       sendHandoffAck(message.requestId);
+      if (message.sourceClientId) {
+        try {
+          const sw=await handoffServiceWorker();
+          sw?.postMessage({type:"HANDOFF_ACK",requestId:message.requestId,targetClientId:message.sourceClientId,receiverTab:handoffTabId,connected:!!connected});
+        } catch(_) {}
+      }
       if (handledHandoffs.size>50) handledHandoffs.delete(handledHandoffs.values().next().value);
     }
   }
@@ -927,6 +956,15 @@
       if(e.key===HANDOFF_STORAGE_KEY && e.newValue){ try{ receiveHandoff(JSON.parse(e.newValue)); }catch(_){} }
       if(e.key===HANDOFF_ACK_KEY && e.newValue){ try{ receiveHandoffAck(JSON.parse(e.newValue)); }catch(_){} }
     });
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message",e=>{
+        const m=e.data;
+        if(m?.type==="HANDOFF_DELIVER") receiveHandoff({type:"handoff",requestId:m.requestId,sourceTab:m.sourceTab||"sw",query:m.query,sourceClientId:m.sourceClientId});
+        else if(m?.type==="HANDOFF_RESULT") receiveSWHandoffResult(m);
+      });
+    }
+    addEventListener("visibilitychange",()=>registerHandoffReceiverWithSW().catch(()=>{}));
+    setInterval(()=>registerHandoffReceiverWithSW().catch(()=>{}),15000);
   }
 
   async function relayShortcutToExistingTabIfRequested() {
@@ -935,26 +973,39 @@
     const query=handoffPayloadFromParams(params);
     if (!query) return false;
     const requestId=uuid();
+
+    // v14 primary path: route through the Service Worker. This does not depend
+    // on BroadcastChannel/localStorage behaviour between Bluefy tabs and lets
+    // the SW focus an already open receiver tab when WebKit permits it.
+    const sw=await handoffServiceWorker();
+    if (sw) {
+      const swAck=new Promise(resolve=>{
+        swHandoffWaiters.set(requestId,resolve);
+        setTimeout(()=>{ if(swHandoffWaiters.delete(requestId)) resolve(false); },2200);
+      });
+      try { sw.postMessage({type:"HANDOFF_REQUEST",requestId,sourceTab:handoffTabId,query,ts:Date.now()}); } catch(_) {}
+      if (await swAck) {
+        status("An den bestehenden Bluefy-Drucktab übergeben. Die App versucht, diesen Tab wieder zu fokussieren.","ok");
+        document.title="Übergeben · NIIMBOT QR Label";
+        setTimeout(()=>{ try{ window.close(); }catch(_){} },250);
+        return true;
+      }
+    }
+
+    // Compatibility fallback for browsers where the Service Worker cannot
+    // route/focus windows. Kept for Android/desktop and older Bluefy builds.
     const message={type:"handoff",requestId,sourceTab:handoffTabId,query,ts:Date.now()};
     const ackPromise=new Promise(resolve=>{
       pendingHandoffAcks.set(requestId,resolve);
-      setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(false); },1200);
+      setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(false); },1400);
     });
     try { handoffChannel?.postMessage(message); } catch(_) {}
     try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(message)); } catch(_) {}
     const acknowledged=await ackPromise;
     if (!acknowledged) return false;
-
-    // The Bluefy scheme does not expose a documented "reuse this tab" flag.
-    // If Bluefy opened a temporary tab, try to close it after the existing
-    // NIIMBOT tab acknowledged the payload. If WebKit refuses window.close(),
-    // the user only needs to close this handoff tab; no printer reconnect.
-    status("An den bereits offenen Bluefy-Drucktab übergeben. Die bestehende B1-Verbindung bleibt erhalten.","ok");
+    status("An den bereits offenen Bluefy-Drucktab übergeben. Falls Bluefy nicht automatisch zurückwechselt, diesen Hilfstab schließen.","ok");
     document.title="Übergeben · NIIMBOT QR Label";
-    setTimeout(()=>{ try{ window.close(); }catch(_){} },180);
-    setTimeout(()=>{
-      if(!document.hidden) status("Übergeben. Falls dieser Tab offen bleibt, einfach schließen – das Label liegt im bestehenden Drucker-Tab bereit.","ok");
-    },700);
+    setTimeout(()=>{ try{ window.close(); }catch(_){} },250);
     return true;
   }
 
@@ -1049,6 +1100,7 @@
         if(!dirty) location.reload();
       });
       if(reg.active) reg.active.postMessage({type:"GET_VERSION"});
+      await registerHandoffReceiverWithSW();
     }catch(e){ els.updateStatus.textContent="Service Worker Fehler"; }
   }
   function showUpdate(){ els.updateStatus.textContent=`v${APP_VERSION} · neue Version bereit`; els.updateBtn.classList.remove("hidden"); }
@@ -1065,6 +1117,7 @@
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     setupHandoffReceiver();
+    await registerSW();
     if (await relayShortcutToExistingTabIfRequested()) return;
     els.appVersion.textContent="v"+APP_VERSION;
     els.qrText.value=await LocalStore.getSetting("draftQr","");
@@ -1157,7 +1210,7 @@
       else if (shortcutAutoprint) status("Kurzbefehl übernommen. B1 verbinden – danach startet der Druck automatisch.","ok");
       else status("Kurzbefehl übernommen. Vorschau ist druckbereit.","ok");
     }
-    await refreshLists(); registerSW();
+    await refreshLists();
     addEventListener("hashchange",()=>applyShortcutParams({announce:true}));
     addEventListener("pagehide",stopScanner);
     setTimeout(()=>{ dirty=false; },200);

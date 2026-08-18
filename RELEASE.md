@@ -1,6 +1,10 @@
-# Release v13
+# Release v14
 
-- Alle projektspezifischen Domain-Referenzen aus Beispielen und Dokumentation entfernt.
-- Beispiel-Domain durch `meineURL.com` ersetzt, auch in URL-codierten Shortcut- und QuickChart-Beispielen.
-- App-/Cache-Version auf v13 erhöht, damit Browser und Bluefy die bereinigten Dateien zuverlässig neu laden.
-- Funktionsumfang von v12 bleibt unverändert: Bluefy-Handoff, direkter Canvas-Druck, Jira-/QR-Übergabe, Kamera, QuickChart, PNG/PDF und Offline-Modus.
+- Bluefy-Handoff grundlegend robuster: Service Worker vermittelt zwischen neu geöffnetem Deep-Link-Hilfstab und bereits offenem Drucktab.
+- Bestehender verbundener Tab wird bevorzugt und per `WindowClient.focus()` best-effort wieder aktiviert.
+- BroadcastChannel/localStorage bleiben nur als Kompatibilitäts-Fallback bestehen.
+- Neue kleine `handoff.html` für Jira/Apple-Kurzbefehle; lädt nicht die komplette Druck-App in einem zweiten Tab.
+- Bestehende `#handoff=1&url=...`-Links bleiben kompatibel.
+- App-/Cache-Version auf v14 erhöht.
+
+Hinweis: Bluefy dokumentiert keinen Parameter, der beim externen `bluefy://open?url=...` garantiert einen vorhandenen Tab ersetzt. v14 vermeidet daher eine Navigation des verbundenen Drucktabs und übergibt nur die Label-Daten.

@@ -1,4 +1,28 @@
-# Apple Kurzbefehle / Jira / Bluefy – v13
+# Apple Kurzbefehle / Jira / Bluefy – v14
+
+## Empfohlen: `handoff.html` für bestehenden Drucktab
+
+Bluefy kann über `bluefy://open?url=...` eine URL öffnen. Ein dokumentierter Schalter für „bestehenden Tab ersetzen“ ist nicht bekannt. v14 verwendet deshalb einen kleinen Übergabe-Endpunkt.
+
+1. NIIMBOT-App einmal normal in Bluefy öffnen und B1 verbinden.
+2. Jira/Shortcut öffnet **nicht** erneut die komplette App, sondern:
+
+```text
+https://USER.github.io/REPO/handoff.html#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D43322
+```
+
+3. Diese URL vollständig URL-codieren und an Bluefy geben:
+
+```text
+bluefy://open?url=ENCODED_HANDOFF_URL
+```
+
+Der Service Worker sucht den bereits offenen App-Tab, bevorzugt einen als verbunden registrierten Tab, übergibt QR/Caption dort ohne Reload und versucht anschließend, genau diesen Tab wieder zu fokussieren. Falls Bluefy/WebKit das Fokussieren verweigert, bleibt nur der kleine Hilfstab vorne; das Label ist trotzdem im alten Tab angekommen und dessen BLE-Dokument wurde nicht neu geladen.
+
+Die ältere Form `#handoff=1&url=...` bleibt als Kompatibilitätsweg erhalten.
+
+---
+
 
 ## Wichtig: bestehenden Bluefy-Drucktab wiederverwenden
 
