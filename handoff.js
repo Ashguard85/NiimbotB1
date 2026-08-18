@@ -3,6 +3,7 @@ const CHANNEL="niimbot-qr-handoff-v1";
 const STORAGE_KEY="niimbotQrHandoffV1";
 const ACK_KEY="niimbotQrHandoffAckV1";
 const RECEIVER_PREFIX="niimbotQrReceiverV2:";
+const PRIMARY_PRINTER_TAB_KEY="niimbotQrPrimaryPrinterTabV1";
 const PRINT_WINDOW_NAME="niimbot-print";
 const statusEl=document.getElementById("status");
 const focusBtn=document.getElementById("focusTab");
@@ -53,7 +54,8 @@ function refreshDiagnostics(){diagEl.textContent=diagnostics();}
 
 function receiverCandidate(){
   if(!storageOK) return null;
-  const now=Date.now(); let best=null; const stale=[];
+  const now=Date.now(); let best=null; const stale=[]; let primaryTabId="";
+  try{const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");if(primary.tabId&&now-Number(primary.ts||0)<90000)primaryTabId=primary.tabId;}catch(_){}
   try{
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i); if(!k?.startsWith(RECEIVER_PREFIX)) continue;
@@ -61,7 +63,7 @@ function receiverCandidate(){
       const age=now-Number(v.ts||0);
       if(!v?.tabId || age>90000){stale.push(k);continue;}
       // connected always wins; then focused/visible; age only breaks ties.
-      const score=(v.connected?1000000:0)+(v.focused?10000:0)+(v.visible?5000:0)+Math.max(0,90000-age);
+      const score=(v.tabId===primaryTabId?100000000:0)+(v.connected?1000000:0)+(v.focused?10000:0)+(v.visible?5000:0)+Math.max(0,90000-age);
       if(!best||score>best.score) best={...v,ageMs:age,score};
     }
     for(const k of stale) try{localStorage.removeItem(k);}catch(_){}

@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "20";
+  const APP_VERSION = "21";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -24,6 +24,7 @@
   let scanLastFrame = 0;
   let autoCaptionValue = "";
   let nativeQrDetector = undefined;
+  let bleChooserUiActive = false;
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
 
@@ -35,6 +36,7 @@
   const HANDOFF_ACK_KEY = "niimbotQrHandoffAckV1";
   const HANDOFF_RECEIVER_PREFIX = "niimbotQrReceiverV2:";
   const PRINT_WINDOW_NAME = "niimbot-print";
+  const PRIMARY_PRINTER_TAB_KEY = "niimbotQrPrimaryPrinterTabV1";
   const handoffTabId = sessionStorage.getItem("niimbotHandoffTabId") || uuid();
   sessionStorage.setItem("niimbotHandoffTabId", handoffTabId);
   const handledHandoffs = new Set();
@@ -61,7 +63,32 @@
     els.printerDot.classList.toggle("ok", on);
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
+    try {
+      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:21}));
+      else {
+        const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
+        if(primary.tabId===handoffTabId) localStorage.removeItem(PRIMARY_PRINTER_TAB_KEY);
+      }
+    } catch (_) {}
     updateHandoffReceiverState();
+  }
+
+  function beginBleChooserUi() {
+    if (bleChooserUiActive) return;
+    bleChooserUiActive = true;
+    clearTimeout(renderTimer);
+    renderGeneration++;
+    document.documentElement.classList.add("ble-choosing");
+    document.body.classList.add("ble-choosing");
+    try { window.scrollTo({top:0,left:0,behavior:"instant"}); } catch (_) { try { window.scrollTo(0,0); } catch (_) {} }
+  }
+
+  function endBleChooserUi() {
+    if (!bleChooserUiActive) return;
+    bleChooserUiActive = false;
+    document.documentElement.classList.remove("ble-choosing");
+    document.body.classList.remove("ble-choosing");
+    requestAnimationFrame(()=>{ void render(true); });
   }
 
   function printerGeometry() {
@@ -262,6 +289,7 @@
   }
 
   function render(immediate=false) {
+    if (bleChooserUiActive && !immediate) return Promise.resolve();
     clearTimeout(renderTimer);
     const generation=++renderGeneration;
     const draw = async () => {
@@ -758,8 +786,8 @@
       els.connectBtn.disabled=true; status("Bluetooth-Verbindung wird vorbereitet …","info");
       activePrinter=await B1Printer.connect({onStage:(ev)=>{
         if(!ev || !ev.stage) return;
-        if(ev.stage==="chooser") status("beacio-Geräteauswahl geöffnet – bitte den NIIMBOT auswählen …","info");
-        else if(ev.stage==="selected") status(`Gerät gewählt: ${ev.detail || "Bluetooth-Gerät"}. NIIMBOT-Kompatibilität wird geprüft …`,"info");
+        if(ev.stage==="chooser") { beginBleChooserUi(); status("beacio-Geräteauswahl geöffnet – Auswahloberfläche wird stabilisiert …","info"); }
+        else if(ev.stage==="selected") { endBleChooserUi(); status(`Gerät gewählt: ${ev.detail || "Bluetooth-Gerät"}. NIIMBOT-Kompatibilität wird geprüft …`,"info"); }
         else if(ev.stage==="identify") status("NIIMBOT-Treiber wird vorbereitet …","info");
         else if(ev.stage==="identified") status("NIIMBOT erkannt – Verbindung wird abgeschlossen …","info");
       }});
@@ -778,7 +806,10 @@
     } catch(e) {
       setConnected(false);
       status("Verbindung fehlgeschlagen: "+e.message,"error");
-    } finally { els.connectBtn.disabled=false; }
+    } finally {
+      endBleChooserUi();
+      els.connectBtn.disabled=false;
+    }
   }
 
   async function printLabel() {
@@ -909,9 +940,12 @@
       visible: document.visibilityState === "visible",
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : false,
       ts: Date.now(),
-      version: 18
+      version: 21
     };
     try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
+    if (connected) {
+      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:21})); } catch (_) {}
+    }
     try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}
   }
 
@@ -994,6 +1028,11 @@
 
   function bestReceiverFromStorage() {
     const now=Date.now(); let best=null;
+    let primaryTabId="";
+    try {
+      const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
+      if(primary.tabId && now-Number(primary.ts||0)<90000) primaryTabId=primary.tabId;
+    } catch (_) {}
     try {
       const stale=[];
       for(let i=0;i<localStorage.length;i++){
@@ -1004,7 +1043,7 @@
         if(item.tabId===handoffTabId) continue;
         // Priority is intentionally lexicographic: connected > visible/focused > age.
         // A recently connected background tab must beat a visible but unconnected helper.
-        const score=(item.connected?1000000:0)+(item.focused?10000:0)+(item.visible?5000:0)+Math.max(0,90000-age);
+        const score=(item.tabId===primaryTabId?100000000:0)+(item.connected?1000000:0)+(item.focused?10000:0)+(item.visible?5000:0)+Math.max(0,90000-age);
         if(!best||score>best.score) best={...item,ageMs:age,score};
       }
       for(const key of stale) try{localStorage.removeItem(key);}catch(_){}
