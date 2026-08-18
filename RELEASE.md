@@ -1,11 +1,11 @@
-# v22
+# v23
 
 - Safari/beacio: nur der tatsächlich verbundene Drucktab besitzt den Fensternamen `niimbot-print`.
 - Neue Safari-Tabs mit `#url=`, `#qr=` oder QuickChart-Parametern übergeben automatisch an einen vorhandenen verbundenen Primary-Tab.
 - Dadurch wird das Befüllen unabhängig von `handoff.html`/`handoff=1`, sobald bereits ein verbundener Drucktab existiert.
 - Fokuswechsel bleibt browserabhängig; der Benutzer-gestützte Wechsel adressiert nun eindeutig den verbundenen Tab.
 
-# Release v22
+# Release v23
 
 - Safari + beacio: neutraler Bluetooth-Gerätewähler für den Verbindungsaufbau.
 - Unter iPhone/Safari+beacio wird der enge NIIMBOT-Chooser-Filter temporär durch `acceptAllDevices: true` ersetzt; die vom NIIMBOT-Treiber angeforderten `optionalServices` bleiben erhalten.
@@ -13,10 +13,10 @@
 - Verbindungsstatus unterscheidet jetzt: Treiber vorbereiten → beacio-Geräteauswahl → Gerät gewählt → NIIMBOT erkannt → verbunden bzw. konkrete Fehlermeldung.
 - Bluefy nutzt weiterhin den bisherigen NIIMBOT-Chooser und bleibt als Fallback verfügbar.
 - B1 nutzt auf iOS weiterhin konservative CoreBluetooth-Transportwerte.
-- Versions-/Cache-Korrektur: UI, Asset-Query und Service-Worker-Cache sind konsistent v22 / `qr-label-pwa-v22`.
+- Versions-/Cache-Korrektur: UI, Asset-Query und Service-Worker-Cache sind konsistent v23 / `qr-label-pwa-v23`.
 
 
-## v22
+## v23
 - Stabilisiert den Safari+beacio-Gerätewähler: während `requestDevice()` wird die schwere App-Oberfläche temporär ausgeblendet und Live-Rendering pausiert.
 - Der tatsächlich verbundene Drucktab wird als Primary Printer Tab registriert und bei Handoffs exakt priorisiert.
 - Bluefy/Safari-Handoff bleibt ohne Server-Endpunkt.

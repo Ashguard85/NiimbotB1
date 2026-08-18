@@ -30,6 +30,7 @@
     }
   };
 
+  const NIIMBOT_NAME_PREFIXES = ["B1","B2","B21","M2","D11","D110","N1","NIIMBOT"];
   const chooserModel = { id:4096, name_prefixes:["B1"], task:"b1", density:3, label_type:1, speed:1, dpi:203 };
   let activeModel = MODELS[4096];
   let activeSizeKey = "40x40";
@@ -71,7 +72,7 @@
     return isIOS() && !isBluefy() && !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
   }
 
-  function installRequestDeviceOverride(onStage) {
+  function installRequestDeviceOverride(onStage, {allDevices=false}={}) {
     if (!shouldUseNeutralChooser()) return () => {};
     const bt = navigator.bluetooth;
     const original = bt.requestDevice;
@@ -80,8 +81,11 @@
     const neutral = async function(options = {}) {
       const optionalServices = Array.isArray(options.optionalServices) ? options.optionalServices : [];
       onStage?.({ stage:"chooser", detail:"Neutraler beacio-Gerätewähler geöffnet" });
+      const chooserOptions = allDevices
+        ? { acceptAllDevices:true }
+        : { filters: NIIMBOT_NAME_PREFIXES.map(namePrefix => ({namePrefix})) };
       const device = await original.call(bt, {
-        acceptAllDevices: true,
+        ...chooserOptions,
         ...(optionalServices.length ? { optionalServices } : {})
       });
       onStage?.({ stage:"selected", detail: device?.name || "Bluetooth-Gerät gewählt", device });
@@ -110,7 +114,7 @@
     const onStage = typeof opts.onStage === "function" ? opts.onStage : null;
     let restoreChooser = () => {};
     try {
-      restoreChooser = installRequestDeviceOverride(onStage);
+      restoreChooser = installRequestDeviceOverride(onStage, {allDevices:!!opts.allDevices});
       onStage?.({ stage:"identify", detail:"NIIMBOT-Erkennung wird gestartet" });
       const info = await Niimbot.identify(chooserModel);
       onStage?.({ stage:"identified", detail:"NIIMBOT-Gerät erkannt", info });

@@ -1,4 +1,4 @@
-# Apple Kurzbefehle / Jira / Safari + beacio / Bluefy – v22
+# Apple Kurzbefehle / Jira / Safari + beacio / Bluefy – v23
 
 
 ## Bevorzugter iPhone-Weg: Safari + beacio
@@ -29,7 +29,7 @@ Die komplette Handoff-URL anschließend URL-codieren und über Bluefy öffnen:
 bluefy://open?url=ENCODED_HANDOFF_URL
 ```
 
-v22 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
+v23 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
 
 1. vorhandenen benannten Drucktab `niimbot-print` direkt finden → `postMessage` → `focus()`;
 2. Same-Origin `BroadcastChannel`;
@@ -89,12 +89,12 @@ https://USER.github.io/REPO/#handoff=1&url=https%3A%2F%2FmeineURL.com%2Fsecure%2
 
 ## Tab-Schließen
 
-Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v22 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
+Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v23 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
 
 Wenn Bluefy den Hilfstab trotzdem nicht entfernt, ist dies eine Host-App-/WKWebView-Grenze. Der Handoff selbst und die B1-Verbindung im alten Drucktab bleiben davon unabhängig.
 
 
-## Safari + beacio ab v22
+## Safari + beacio ab v23
 
 Wenn bereits ein verbundener Drucktab offen ist, genügt auch direkt:
 
@@ -102,4 +102,4 @@ Wenn bereits ein verbundener Drucktab offen ist, genügt auch direkt:
 https://USER.github.io/REPO/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345
 ```
 
-v22 erkennt den verbundenen Primary-Tab und übergibt die URL automatisch dorthin.
+v23 erkennt den verbundenen Primary-Tab und übergibt die URL automatisch dorthin.

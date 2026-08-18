@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "22";
+  const APP_VERSION = "23";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -37,6 +37,8 @@
   const HANDOFF_RECEIVER_PREFIX = "niimbotQrReceiverV2:";
   const PRINT_WINDOW_NAME = "niimbot-print";
   const PRIMARY_PRINTER_TAB_KEY = "niimbotQrPrimaryPrinterTabV1";
+  const PRIMARY_LEASE_MS = 12 * 60 * 60 * 1000;
+  const RECEIVER_LEASE_MS = 90 * 1000;
   const handoffTabId = sessionStorage.getItem("niimbotHandoffTabId") || uuid();
   sessionStorage.setItem("niimbotHandoffTabId", handoffTabId);
   const handledHandoffs = new Set();
@@ -65,7 +67,7 @@
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
     try {
-      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:22}));
+      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:23}));
       else {
         const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
         if(primary.tabId===handoffTabId) localStorage.removeItem(PRIMARY_PRINTER_TAB_KEY);
@@ -782,12 +784,12 @@
     } catch(e) { if(e.name!=="AbortError") status("PDF konnte nicht erstellt werden: "+e.message,"error"); }
   }
 
-  async function connectPrinter() {
+  async function connectPrinter({allDevices=false}={}) {
     try {
       els.connectBtn.disabled=true; status("Bluetooth-Verbindung wird vorbereitet …","info");
-      activePrinter=await B1Printer.connect({onStage:(ev)=>{
+      activePrinter=await B1Printer.connect({allDevices,onStage:(ev)=>{
         if(!ev || !ev.stage) return;
-        if(ev.stage==="chooser") { beginBleChooserUi(); status("beacio-Geräteauswahl geöffnet – Auswahloberfläche wird stabilisiert …","info"); }
+        if(ev.stage==="chooser") { beginBleChooserUi(); status(allDevices?"Alle Bluetooth-Geräte werden angezeigt …":"NIIMBOT-Geräteauswahl geöffnet …","info"); }
         else if(ev.stage==="selected") { endBleChooserUi(); status(`Gerät gewählt: ${ev.detail || "Bluetooth-Gerät"}. NIIMBOT-Kompatibilität wird geprüft …`,"info"); }
         else if(ev.stage==="identify") status("NIIMBOT-Treiber wird vorbereitet …","info");
         else if(ev.stage==="identified") status("NIIMBOT erkannt – Verbindung wird abgeschlossen …","info");
@@ -945,7 +947,7 @@
     };
     try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
     if (connected) {
-      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:22})); } catch (_) {}
+      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:23})); } catch (_) {}
     }
     try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}
   }
@@ -987,6 +989,18 @@
     if (resolve) { pendingHandoffAcks.delete(message.requestId); resolve(message); }
   }
 
+  function consumePendingHandoff() {
+    try {
+      const raw=localStorage.getItem(HANDOFF_STORAGE_KEY);
+      if(!raw) return;
+      const msg=JSON.parse(raw);
+      if(!msg || !msg.requestId || !["handoff","NIIMBOT_HANDOFF"].includes(msg.type)) return;
+      if(msg.sourceTab===handoffTabId) return;
+      if(msg.targetTab && msg.targetTab!==handoffTabId) return;
+      receiveHandoff(msg);
+    } catch(_) {}
+  }
+
   function setupHandoffReceiver() {
     // The normal print tab gets a stable browser-context name. A Bluefy helper
     // can use window.open('', 'niimbot-print') to find/focus it without reload.
@@ -1017,14 +1031,15 @@
       if(m?.type==="NIIMBOT_HANDOFF") receiveHandoff(m,e.source);
       else if(m?.type==="NIIMBOT_HANDOFF_ACK") receiveHandoffAck(m);
     });
-    addEventListener("visibilitychange",updateHandoffReceiverState);
-    addEventListener("pageshow",updateHandoffReceiverState);
-    addEventListener("focus",updateHandoffReceiverState);
+    addEventListener("visibilitychange",()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible") consumePendingHandoff();});
+    addEventListener("pageshow",()=>{updateHandoffReceiverState(); consumePendingHandoff();});
+    addEventListener("focus",()=>{updateHandoffReceiverState(); consumePendingHandoff();});
     addEventListener("blur",updateHandoffReceiverState);
     addEventListener("beforeunload",removeHandoffReceiverState);
     // Bluefy may keep several tabs alive. A short lease makes the currently
     // running/connected receiver distinguishable without a server endpoint.
-    setInterval(updateHandoffReceiverState,1500);
+    consumePendingHandoff();
+    setInterval(()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible") consumePendingHandoff();},1500);
   }
 
   function bestReceiverFromStorage() {
@@ -1032,7 +1047,7 @@
     let primaryTabId="";
     try {
       const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
-      if(primary.tabId && now-Number(primary.ts||0)<90000) primaryTabId=primary.tabId;
+      if(primary.tabId && now-Number(primary.ts||0)<PRIMARY_LEASE_MS) primaryTabId=primary.tabId;
     } catch (_) {}
     try {
       const stale=[];
@@ -1040,11 +1055,11 @@
         const key=localStorage.key(i); if(!key?.startsWith(HANDOFF_RECEIVER_PREFIX)) continue;
         let item; try{item=JSON.parse(localStorage.getItem(key)||"{}");}catch(_){stale.push(key);continue;}
         const age=now-Number(item.ts||0);
-        if(!item?.tabId || age>90000){ stale.push(key); continue; }
+        if(!item?.tabId || age>RECEIVER_LEASE_MS){ stale.push(key); continue; }
         if(item.tabId===handoffTabId) continue;
         // Priority is intentionally lexicographic: connected > visible/focused > age.
         // A recently connected background tab must beat a visible but unconnected helper.
-        const score=(item.tabId===primaryTabId?100000000:0)+(item.connected?1000000:0)+(item.focused?10000:0)+(item.visible?5000:0)+Math.max(0,90000-age);
+        const score=(item.tabId===primaryTabId?100000000:0)+(item.connected?1000000:0)+(item.focused?10000:0)+(item.visible?5000:0)+Math.max(0,RECEIVER_LEASE_MS-age);
         if(!best||score>best.score) best={...item,ageMs:age,score};
       }
       for(const key of stale) try{localStorage.removeItem(key);}catch(_){}
@@ -1072,9 +1087,13 @@
     const now=Date.now();
     try {
       const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
-      if(!primary.tabId || primary.tabId===handoffTabId || now-Number(primary.ts||0)>90000) return null;
+      if(!primary.tabId || primary.tabId===handoffTabId || now-Number(primary.ts||0)>PRIMARY_LEASE_MS) return null;
       const receiver=JSON.parse(localStorage.getItem(HANDOFF_RECEIVER_PREFIX+primary.tabId)||"{}");
-      if(receiver.tabId===primary.tabId && receiver.connected && now-Number(receiver.ts||0)<90000) return receiver;
+      if(receiver.tabId===primary.tabId && receiver.connected) return {...receiver, persistentPrimary:true};
+      // Safari may suspend background timers. The explicit primary lease was written
+      // only by the tab that actually connected to the printer, so keep targeting it
+      // even when its heartbeat is temporarily stale.
+      return {tabId:primary.tabId, connected:true, persistentPrimary:true, ts:Number(primary.ts||0)};
     } catch(_) {}
     return null;
   }
@@ -1104,7 +1123,17 @@
       try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(broad)); } catch(_) {}
     },700);
     const ack=await ackPromise;
-    if (!ack) return false;
+    if (!ack) {
+      // Safari can suspend the connected background tab. Keep the targeted payload
+      // in localStorage; the primary tab consumes it on focus/pageshow. Do not apply
+      // the Jira URL in this helper tab, otherwise the next handoff appears random.
+      if (candidate?.tabId) {
+        status("Übergabe für den verbundenen Drucktab vorgemerkt. Beim Wechsel zurück wird das Label automatisch übernommen.","info");
+        document.title="Übergabe vorgemerkt · NIIMBOT QR Label";
+        return true;
+      }
+      return false;
+    }
     status(ack.connected?"An den verbundenen Drucktab übergeben. B1 bleibt verbunden.":"An den bereits offenen Drucktab übergeben.","ok");
     document.title="Übergeben · NIIMBOT QR Label";
     try { window.close(); } catch(_) {}
@@ -1257,7 +1286,7 @@
   }
 
   async function init() {
-    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
@@ -1332,6 +1361,7 @@
     els.scanPhotoFallbackBtn.addEventListener("click",()=>{ stopScanner(); els.scanImageInput.click(); });
     els.scanModal.addEventListener("click",e=>{ if(e.target===els.scanModal) stopScanner(); });
     els.connectBtn.addEventListener("click",connectPrinter);
+    els.connectAllBtn?.addEventListener("click",()=>connectPrinter({allDevices:true}));
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",shareQrTarget);
     els.savePngBtn.addEventListener("click",savePngSmart);
