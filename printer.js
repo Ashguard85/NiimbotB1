@@ -60,7 +60,7 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v10 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v11 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     activeModel = MODELS[id];
 
@@ -80,21 +80,89 @@
     return current();
   }
 
-  async function print(dataUrl, opts={}) {
+  function installGlobalOverride(name, value) {
+    const hadOwn = Object.prototype.hasOwnProperty.call(window, name);
+    const descriptor = Object.getOwnPropertyDescriptor(window, name);
+    const previous = window[name];
+    let installed = false;
+    try {
+      window[name] = value;
+      installed = window[name] === value;
+    } catch (_) {}
+    if (!installed) {
+      try {
+        Object.defineProperty(window, name, { configurable: true, writable: true, value });
+        installed = window[name] === value;
+      } catch (_) {}
+    }
+    if (!installed) throw new Error(`Bluefy-Kompatibilitätsadapter konnte window.${name} nicht temporär ersetzen.`);
+    return () => {
+      try {
+        if (hadOwn && descriptor) Object.defineProperty(window, name, descriptor);
+        else if (hadOwn) window[name] = previous;
+        else delete window[name];
+      } catch (_) {
+        try { window[name] = previous; } catch (_) {}
+      }
+    };
+  }
+
+  async function printCanvas(canvas, opts={}) {
     if (!window.Niimbot) throw new Error("NIIMBOT-Treiber wurde nicht geladen.");
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error("Druckbild ist kein Canvas.");
+
     const density = Math.min(5, Math.max(1, Number(opts.density || 3)));
     const copies = Math.min(20, Math.max(1, Number(opts.copies || 1)));
     const cur = current();
     const offsetY = Number.isFinite(Number(opts.offsetY)) ? Number(opts.offsetY) : cur.size.offset_y_px || 0;
-    return Niimbot.printImage(dataUrl, {
-      model: cur.model,
-      size: cur.size,
-      density,
-      copies,
-      offsetY,
-      onProgress: opts.onProgress
-    });
+
+    // niimbot-web-bluetooth 2.4.0 expects an image URL and internally executes:
+    // fetch(url) -> response.blob() -> createImageBitmap(blob) -> drawImage(...).
+    // Bluefy/WebKit can fail in that load/decode path with the generic "Load failed".
+    // For printing we already HAVE the fully rendered canvas, so v11 bridges exactly
+    // that one driver request back to this canvas. No URL is loaded, no Blob is decoded.
+    const sentinelUrl = `https://niimbot-canvas.invalid/${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const sentinel = Object.freeze({ __niimbotCanvasBridge: true, canvas });
+    const nativeFetch = window.fetch;
+    const nativeCreateImageBitmap = window.createImageBitmap;
+
+    if (typeof nativeFetch !== "function") throw new Error("Browser-Fetch fehlt; NIIMBOT-Treiber kann nicht gestartet werden.");
+
+    const bridgeFetch = async (input, init) => {
+      const url = typeof input === "string" ? input : (input && input.url) || String(input || "");
+      if (url === sentinelUrl) {
+        return {
+          ok: true,
+          status: 200,
+          blob: async () => sentinel
+        };
+      }
+      return nativeFetch.call(window, input, init);
+    };
+
+    const bridgeCreateImageBitmap = async (source, ...args) => {
+      if (source === sentinel) return canvas;
+      if (typeof nativeCreateImageBitmap === "function") return nativeCreateImageBitmap.call(window, source, ...args);
+      throw new Error("createImageBitmap ist in diesem Browser nicht verfügbar.");
+    };
+
+    const restoreFetch = installGlobalOverride("fetch", bridgeFetch);
+    let restoreBitmap;
+    try {
+      restoreBitmap = installGlobalOverride("createImageBitmap", bridgeCreateImageBitmap);
+      return await Niimbot.printImage(sentinelUrl, {
+        model: cur.model,
+        size: cur.size,
+        density,
+        copies,
+        offsetY,
+        onProgress: opts.onProgress
+      });
+    } finally {
+      if (restoreBitmap) restoreBitmap();
+      restoreFetch();
+    }
   }
 
-  window.B1Printer = { supported, connect, print, current, setSize, MODELS, LABEL_PRESETS };
+  window.B1Printer = { supported, connect, printCanvas, current, setSize, MODELS, LABEL_PRESETS };
 })();

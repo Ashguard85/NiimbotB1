@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "10";
+  const APP_VERSION = "11";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -763,21 +763,16 @@
     if(!qr || !connected) return;
     try {
       dirty=true; els.printBtn.disabled=true; els.connectBtn.disabled=true;
-      status("Druckbild wird vorbereitet …","info");
-      // Bluefy/WebKit can fail on fetch(data:...) inside the NIIMBOT driver with
-      // the generic error "Load failed". Use a short-lived blob: URL instead.
-      // This also avoids turning a potentially large 40×40 canvas into a base64 string.
-      const printBlob = await canvasBlob();
-      const printUrl = URL.createObjectURL(printBlob);
-      try {
-        status("Druckdaten werden übertragen …","info");
-        await B1Printer.print(printUrl,{
-          density:Number(els.density.value), copies:Number(els.copies.value), offsetY:Number(els.offsetY.value),
-          onProgress:(s)=>status(typeof s==="string" ? s : "Druck läuft …","info")
-        });
-      } finally {
-        URL.revokeObjectURL(printUrl);
-      }
+      status("Druckbild wird direkt aus dem Canvas vorbereitet …","info");
+      // v11 prints the already rendered canvas directly through a Bluefy compatibility
+      // bridge. The NIIMBOT driver's URL -> fetch -> Blob -> createImageBitmap path is
+      // bypassed completely for this one print.
+      await render(true);
+      status("Canvas wird gepackt und übertragen …","info");
+      await B1Printer.printCanvas(els.labelCanvas,{
+        density:Number(els.density.value), copies:Number(els.copies.value), offsetY:Number(els.offsetY.value),
+        onProgress:(s)=>status(typeof s==="string" ? s : "Druck läuft …","info")
+      });
       const entry={
         id:uuid(), qr_text:qr, caption:els.caption.value.trim(), printer:activePrinter?.name || "NIIMBOT",
         label_size:els.labelSize.value, copies:Number(els.copies.value), density:Number(els.density.value), created_at:now()
@@ -787,7 +782,7 @@
     } catch(e) {
       const msg = String(e && e.message || e || "Unbekannter Fehler");
       if (/load failed/i.test(msg)) {
-        status("Druckfehler: Bluefy konnte das Druckbild nicht laden. v10 verwendet dafür bereits den stabileren Blob-Weg; Seite neu laden und erneut verbinden.","error");
+        status("Druckfehler: Load failed trotz direktem Canvas-Pfad. Das kommt in v11 nicht mehr vom Laden des Druckbilds; bitte Verbindung trennen, B1 neu einschalten und erneut verbinden. Fehlerdetails: "+msg,"error");
       } else {
         status("Druckfehler: "+msg+" – falls bereits Papier ausgegeben wurde, Druckbild prüfen.","error");
       }

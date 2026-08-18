@@ -82,6 +82,8 @@ Ab v7 startet die App mit **40×40 mm**. Der Button **PDF** erzeugt eine einseit
 **Offline lokal** benötigt keinen QuickChart-Zugriff. QR und Caption werden vollständig im Browser erzeugt. Die Caption sitzt in v7 näher am QR-Code. Im Modus **Auto** wird ein erkannter QuickChart-Link online über QuickChart gerendert; offline fällt die App lokal zurück. Auch im expliziten QuickChart-Modus erfolgt bei Timeout, Netzwerk- oder CORS-Fehler ein lokaler Fallback statt eines leeren Labels.
 
 
-## iOS/Bluefy Drucktransport (v10)
+## iOS/Bluefy Drucktransport (v11)
 
-v10 übergibt das gerenderte Label als `blob:`-URL an den NIIMBOT-Treiber. Das vermeidet den auf Bluefy beobachteten `Load failed`-Fehler bei `fetch(data:...)`. Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche Druck muss weiterhin mit realer B1-Hardware geprüft werden.
+Der Upstream-Treiber `niimbot-web-bluetooth` lädt Bild-URLs intern über `fetch(url) -> blob() -> createImageBitmap()`. Bluefy kann genau an dieser Lade-/Decodierstufe mit `Load failed` abbrechen. v11 übergibt deshalb keine Bild-URL mehr: Die App hält das fertige Label bereits als Canvas vor und verwendet beim Druck einen eng begrenzten Kompatibilitätsadapter, der genau den internen Bildabruf des Treibers auf dieses Canvas zurückführt. Dadurch gibt es für den eigentlichen Druck weder einen `data:`-/`blob:`-Fetch noch eine Bilddecodierung. Nach dem Druck werden die temporären Global-Overrides sofort wiederhergestellt.
+
+Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche BLE-Druck muss weiterhin mit realer B1-Hardware geprüft werden.
