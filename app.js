@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "23";
+  const APP_VERSION = "25";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -35,6 +35,7 @@
   const HANDOFF_STORAGE_KEY = "niimbotQrHandoffV1";
   const HANDOFF_ACK_KEY = "niimbotQrHandoffAckV1";
   const HANDOFF_RECEIVER_PREFIX = "niimbotQrReceiverV2:";
+  const HANDOFF_INBOX_PREFIX = "niimbotQrInboxV1:";
   const PRINT_WINDOW_NAME = "niimbot-print";
   const PRIMARY_PRINTER_TAB_KEY = "niimbotQrPrimaryPrinterTabV1";
   const PRIMARY_LEASE_MS = 12 * 60 * 60 * 1000;
@@ -67,7 +68,7 @@
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
     try {
-      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:23}));
+      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:24}));
       else {
         const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
         if(primary.tabId===handoffTabId) localStorage.removeItem(PRIMARY_PRINTER_TAB_KEY);
@@ -928,6 +929,40 @@
   }
 
   function receiverStorageKey() { return HANDOFF_RECEIVER_PREFIX + handoffTabId; }
+  function handoffInboxKey(tabId=handoffTabId) { return HANDOFF_INBOX_PREFIX + tabId; }
+
+  function enqueueHandoffForTab(tabId, message) {
+    if (!tabId || !message?.requestId) return false;
+    try {
+      const key=handoffInboxKey(tabId);
+      let queue=[];
+      try { const parsed=JSON.parse(localStorage.getItem(key)||"[]"); if(Array.isArray(parsed)) queue=parsed; } catch(_) {}
+      queue=queue.filter(x=>x?.requestId && x.requestId!==message.requestId).slice(-19);
+      queue.push({...message,targetTab:tabId,queuedAt:Date.now()});
+      localStorage.setItem(key,JSON.stringify(queue));
+      return true;
+    } catch(_) { return false; }
+  }
+
+  let handoffInboxConsuming=false;
+  async function consumeHandoffInbox() {
+    if(handoffInboxConsuming) return;
+    handoffInboxConsuming=true;
+    try {
+      const key=handoffInboxKey();
+      let queue=[];
+      try { const parsed=JSON.parse(localStorage.getItem(key)||"[]"); if(Array.isArray(parsed)) queue=parsed; } catch(_) {}
+      if(!queue.length) return;
+      const keep=[];
+      for(const msg of queue){
+        if(!msg?.requestId) continue;
+        if(msg.targetTab && msg.targetTab!==handoffTabId){ keep.push(msg); continue; }
+        try { await receiveHandoff(msg); } catch(_) { keep.push(msg); }
+      }
+      if(keep.length) localStorage.setItem(key,JSON.stringify(keep.slice(-20)));
+      else localStorage.removeItem(key);
+    } catch(_) {} finally { handoffInboxConsuming=false; }
+  }
 
   let handoffConnectedSince = 0;
   function updateHandoffReceiverState() {
@@ -943,11 +978,11 @@
       visible: document.visibilityState === "visible",
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : false,
       ts: Date.now(),
-      version: 22
+      version: 24
     };
     try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
     if (connected) {
-      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:23})); } catch (_) {}
+      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:24})); } catch (_) {}
     }
     try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}
   }
@@ -1023,6 +1058,7 @@
     }
     addEventListener("storage",e=>{
       if(e.key===HANDOFF_STORAGE_KEY && e.newValue){ try{ receiveHandoff(JSON.parse(e.newValue)); }catch(_){} }
+      if(e.key===handoffInboxKey() && e.newValue){ void consumeHandoffInbox(); }
       if(e.key===HANDOFF_ACK_KEY && e.newValue){ try{ receiveHandoffAck(JSON.parse(e.newValue)); }catch(_){} }
     });
     addEventListener("message",e=>{
@@ -1030,16 +1066,18 @@
       const m=e.data;
       if(m?.type==="NIIMBOT_HANDOFF") receiveHandoff(m,e.source);
       else if(m?.type==="NIIMBOT_HANDOFF_ACK") receiveHandoffAck(m);
+      else if(m?.type==="NIIMBOT_FOCUS_REQUEST") { try { window.focus(); } catch(_) {} }
     });
-    addEventListener("visibilitychange",()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible") consumePendingHandoff();});
-    addEventListener("pageshow",()=>{updateHandoffReceiverState(); consumePendingHandoff();});
-    addEventListener("focus",()=>{updateHandoffReceiverState(); consumePendingHandoff();});
+    addEventListener("visibilitychange",()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible"){ consumePendingHandoff(); void consumeHandoffInbox(); }});
+    addEventListener("pageshow",()=>{updateHandoffReceiverState(); consumePendingHandoff(); void consumeHandoffInbox();});
+    addEventListener("focus",()=>{updateHandoffReceiverState(); consumePendingHandoff(); void consumeHandoffInbox();});
     addEventListener("blur",updateHandoffReceiverState);
     addEventListener("beforeunload",removeHandoffReceiverState);
     // Bluefy may keep several tabs alive. A short lease makes the currently
     // running/connected receiver distinguishable without a server endpoint.
     consumePendingHandoff();
-    setInterval(()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible") consumePendingHandoff();},1500);
+    void consumeHandoffInbox();
+    setInterval(()=>{updateHandoffReceiverState(); if(document.visibilityState==="visible"){ consumePendingHandoff(); void consumeHandoffInbox(); }},1500);
   }
 
   function bestReceiverFromStorage() {
@@ -1114,6 +1152,7 @@
       setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(null); },2200);
     });
     tryDirectNamedHandoff(message);
+    if(candidate?.tabId) enqueueHandoffForTab(candidate.tabId,message);
     try { handoffChannel?.postMessage(message); } catch(_) {}
     try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(message)); } catch(_) {}
     if(candidate) setTimeout(()=>{
