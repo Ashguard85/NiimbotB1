@@ -1,4 +1,4 @@
-# Architektur v27
+# Architektur v28
 
 ```text
 Gemeinsames Frontend
@@ -49,6 +49,6 @@ Android/Desktop: natives Web Bluetooth.
 Es gibt bewusst keinen separaten beacio-Printer-Provider; die App bleibt auf der W3C-Web-Bluetooth-Oberfläche.
 
 
-## v27 Bluetooth-Lifecycle
+## v28 Bluetooth-Lifecycle
 
 Der Drucker bleibt nicht zwingend an einen einzigen Tab gebunden. Nach der erstmaligen Benutzerfreigabe speichert die App nur eine Präferenz (Geräte-ID/Name). Neue Tabs können bei unterstützter Web-Bluetooth-Implementierung über `navigator.bluetooth.getDevices()` das bereits autorisierte Gerät wiederfinden. Die eigentliche GATT-Verbindung wird weiterhin pro Tab aufgebaut. Nach erfolgreichem Druck kann die App die Verbindung automatisch trennen. Es gibt keine parallele Mehrtab-GATT-Nutzung und keine serverseitige Bluetooth-Bridge.

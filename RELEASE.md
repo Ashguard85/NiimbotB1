@@ -1,4 +1,12 @@
-# v27 – Known-device Reconnect Test
+# Release v28
+
+- Option „Nach URL-Aufruf automatisch drucken“ (Default: aus).
+- Auto-Print startet erst nach erfolgreicher Wiederverbindung des bekannten NIIMBOT.
+- `autoprint=1` bleibt als expliziter URL-Override erhalten.
+- Bestehende Option „Nach erfolgreichem Druck trennen“ kann anschließend BLE freigeben.
+- Keine automatische Ausgabe nur aufgrund eines gespeicherten alten Entwurfs.
+
+# v28 – Known-device Reconnect Test
 
 - `navigator.bluetooth.getDevices()` wird genutzt, um einen bereits freigegebenen NIIMBOT in einem neuen Tab wiederzufinden.
 - Der bekannte Drucker wird anhand Geräte-ID, ersatzweise Name, ausgewählt und ohne erneuten Chooser an den NIIMBOT-Treiber übergeben.
@@ -6,7 +14,7 @@
 - Bei URL-/Shortcut-Start mit QR-Inhalt wird ein bekannter Drucker automatisch wiederverbunden, wenn die Option aktiviert ist.
 - Neue Optionen: „Bekannten Drucker automatisch verbinden“ und „Nach erfolgreichem Druck trennen“, beide standardmäßig aktiv.
 - Nach bestätigtem Druck wartet die App 800 ms und trennt anschließend GATT, damit ein neuer Tab den Drucker übernehmen kann.
-- UI-/Asset-/Service-Worker-Version auf v27 angehoben.
+- UI-/Asset-/Service-Worker-Version auf v28 angehoben.
 
 # v22
 

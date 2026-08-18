@@ -103,3 +103,14 @@ https://USER.github.io/REPO/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObjec
 ```
 
 v22 erkennt den verbundenen Primary-Tab und übergibt die URL automatisch dorthin.
+
+
+## Auto-Druck in v28
+
+Wenn **Nach URL-Aufruf automatisch drucken** in der App aktiviert ist, reicht z. B.:
+
+```text
+https://Ashguard85.github.io/NiimbotB1/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345
+```
+
+Die App übernimmt die Nutzlast, versucht den bekannten Drucker automatisch wiederzuverbinden und druckt nach erfolgreicher Verbindung. Alternativ erzwingt `&autoprint=1` den Auto-Druck nur für den jeweiligen Aufruf, unabhängig von der gespeicherten Option.
