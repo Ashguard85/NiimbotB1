@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "15";
+  const APP_VERSION = "16";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -32,12 +32,13 @@
   const HANDOFF_CHANNEL_NAME = "niimbot-qr-handoff-v1";
   const HANDOFF_STORAGE_KEY = "niimbotQrHandoffV1";
   const HANDOFF_ACK_KEY = "niimbotQrHandoffAckV1";
+  const HANDOFF_RECEIVER_PREFIX = "niimbotQrReceiverV2:";
+  const PRINT_WINDOW_NAME = "niimbot-print";
   const handoffTabId = sessionStorage.getItem("niimbotHandoffTabId") || uuid();
   sessionStorage.setItem("niimbotHandoffTabId", handoffTabId);
   const handledHandoffs = new Set();
   const pendingHandoffAcks = new Map();
   let handoffChannel = null;
-  const swHandoffWaiters = new Map();
 
   const now = () => new Date().toISOString();
   const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"40x40":1,"50x30":1}));
@@ -59,7 +60,7 @@
     els.printerDot.classList.toggle("ok", on);
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
-    registerHandoffReceiverWithSW().catch(()=>{});
+    updateHandoffReceiverState();
   }
 
   function printerGeometry() {
@@ -878,27 +879,6 @@
     return ["1","true","yes","ja","on"].includes(String(value||"").toLowerCase());
   }
 
-  async function handoffServiceWorker() {
-    if (!("serviceWorker" in navigator)) return null;
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      return navigator.serviceWorker.controller || reg.active || null;
-    } catch (_) { return null; }
-  }
-
-  async function registerHandoffReceiverWithSW() {
-    const sw = await handoffServiceWorker();
-    if (!sw) return false;
-    sw.postMessage({type:"HANDOFF_REGISTER",tabId:handoffTabId,connected:!!connected,ts:Date.now()});
-    return true;
-  }
-
-  function receiveSWHandoffResult(message) {
-    if (!message || message.type!=="HANDOFF_RESULT" || !message.requestId) return;
-    const resolve=swHandoffWaiters.get(message.requestId);
-    if (resolve) { swHandoffWaiters.delete(message.requestId); resolve(!!message.ok); }
-  }
-
   function handoffPayloadFromParams(params) {
     const copy = new URLSearchParams(params);
     copy.delete("handoff");
@@ -906,15 +886,34 @@
     return copy.toString();
   }
 
-  function sendHandoffAck(requestId) {
-    const ack={type:"ack",requestId,receiverTab:handoffTabId,ts:Date.now()};
-    try { handoffChannel?.postMessage(ack); } catch(_) {}
-    try { localStorage.setItem(HANDOFF_ACK_KEY, JSON.stringify(ack)); } catch(_) {}
+  function receiverStorageKey() { return HANDOFF_RECEIVER_PREFIX + handoffTabId; }
+
+  function updateHandoffReceiverState() {
+    try {
+      localStorage.setItem(receiverStorageKey(), JSON.stringify({
+        tabId: handoffTabId,
+        connected: !!connected,
+        visible: document.visibilityState === "visible",
+        ts: Date.now()
+      }));
+    } catch (_) {}
   }
 
-  async function receiveHandoff(message) {
-    if (!message || message.type!=="handoff" || !message.requestId || message.sourceTab===handoffTabId) return;
-    if (handledHandoffs.has(message.requestId)) { sendHandoffAck(message.requestId); return; }
+  function removeHandoffReceiverState() {
+    try { localStorage.removeItem(receiverStorageKey()); } catch (_) {}
+  }
+
+  function sendHandoffAck(requestId, directSource=null) {
+    const ack={type:"ack",requestId,receiverTab:handoffTabId,connected:!!connected,ts:Date.now()};
+    try { handoffChannel?.postMessage(ack); } catch(_) {}
+    try { localStorage.setItem(HANDOFF_ACK_KEY, JSON.stringify(ack)); } catch(_) {}
+    try { directSource?.postMessage({...ack,type:"NIIMBOT_HANDOFF_ACK"}, location.origin); } catch(_) {}
+  }
+
+  async function receiveHandoff(message, directSource=null) {
+    if (!message || !["handoff","NIIMBOT_HANDOFF"].includes(message.type) || !message.requestId || message.sourceTab===handoffTabId) return;
+    if (message.targetTab && message.targetTab!==handoffTabId) return;
+    if (handledHandoffs.has(message.requestId)) { sendHandoffAck(message.requestId,directSource); return; }
     handledHandoffs.add(message.requestId);
     try {
       const params=new URLSearchParams(message.query||"");
@@ -923,25 +922,30 @@
         toast("Jira/QR-Link aus Bluefy übernommen");
         if (connected) status("Neues Label im bestehenden Drucker-Tab übernommen. B1 bleibt verbunden.","ok");
       }
+      try { window.focus(); } catch(_) {}
     } finally {
-      sendHandoffAck(message.requestId);
-      if (message.sourceClientId) {
-        try {
-          const sw=await handoffServiceWorker();
-          sw?.postMessage({type:"HANDOFF_ACK",requestId:message.requestId,targetClientId:message.sourceClientId,receiverTab:handoffTabId,connected:!!connected});
-        } catch(_) {}
-      }
+      sendHandoffAck(message.requestId,directSource);
+      updateHandoffReceiverState();
       if (handledHandoffs.size>50) handledHandoffs.delete(handledHandoffs.values().next().value);
     }
   }
 
   function receiveHandoffAck(message) {
-    if (!message || message.type!=="ack" || !message.requestId || message.receiverTab===handoffTabId) return;
+    if (!message || !["ack","NIIMBOT_HANDOFF_ACK"].includes(message.type) || !message.requestId || message.receiverTab===handoffTabId) return;
     const resolve=pendingHandoffAcks.get(message.requestId);
-    if (resolve) { pendingHandoffAcks.delete(message.requestId); resolve(true); }
+    if (resolve) { pendingHandoffAcks.delete(message.requestId); resolve(message); }
   }
 
   function setupHandoffReceiver() {
+    // The normal print tab gets a stable browser-context name. A Bluefy helper
+    // can use window.open('', 'niimbot-print') to find/focus it without reload.
+    const relayParams=shortcutParams();
+    const isRelay=truthyParam(relayParams.get("handoff") ?? relayParams.get("relay"));
+    if (!isRelay) {
+      try { window.name=PRINT_WINDOW_NAME; } catch(_) {}
+      try { window.__NIIMBOT_HANDOFF_RECEIVER__=true; } catch(_) {}
+      updateHandoffReceiverState();
+    }
     if ("BroadcastChannel" in window) {
       try {
         handoffChannel=new BroadcastChannel(HANDOFF_CHANNEL_NAME);
@@ -956,15 +960,42 @@
       if(e.key===HANDOFF_STORAGE_KEY && e.newValue){ try{ receiveHandoff(JSON.parse(e.newValue)); }catch(_){} }
       if(e.key===HANDOFF_ACK_KEY && e.newValue){ try{ receiveHandoffAck(JSON.parse(e.newValue)); }catch(_){} }
     });
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.addEventListener("message",e=>{
-        const m=e.data;
-        if(m?.type==="HANDOFF_DELIVER") receiveHandoff({type:"handoff",requestId:m.requestId,sourceTab:m.sourceTab||"sw",query:m.query,sourceClientId:m.sourceClientId});
-        else if(m?.type==="HANDOFF_RESULT") receiveSWHandoffResult(m);
-      });
-    }
-    addEventListener("visibilitychange",()=>registerHandoffReceiverWithSW().catch(()=>{}));
-    setInterval(()=>registerHandoffReceiverWithSW().catch(()=>{}),15000);
+    addEventListener("message",e=>{
+      if(e.origin!==location.origin) return;
+      const m=e.data;
+      if(m?.type==="NIIMBOT_HANDOFF") receiveHandoff(m,e.source);
+      else if(m?.type==="NIIMBOT_HANDOFF_ACK") receiveHandoffAck(m);
+    });
+    addEventListener("visibilitychange",updateHandoffReceiverState);
+    addEventListener("pageshow",updateHandoffReceiverState);
+    addEventListener("beforeunload",removeHandoffReceiverState);
+    setInterval(updateHandoffReceiverState,5000);
+  }
+
+  function bestReceiverFromStorage() {
+    const now=Date.now(); let best=null;
+    try {
+      for(let i=0;i<localStorage.length;i++){
+        const key=localStorage.key(i); if(!key?.startsWith(HANDOFF_RECEIVER_PREFIX)) continue;
+        let item; try{item=JSON.parse(localStorage.getItem(key)||"{}");}catch(_){continue;}
+        if(!item?.tabId || item.tabId===handoffTabId || now-(item.ts||0)>45000) continue;
+        const score=(item.connected?1000:0)+(item.visible?100:0)+Math.max(0,45-Math.floor((now-item.ts)/1000));
+        if(!best||score>best.score) best={...item,score};
+      }
+    } catch(_) {}
+    return best;
+  }
+
+  function tryDirectNamedHandoff(message) {
+    try {
+      const w=window.open("",PRINT_WINDOW_NAME);
+      if(!w) return false;
+      let marker=false; try{marker=w.__NIIMBOT_HANDOFF_RECEIVER__===true;}catch(_){}
+      if(!marker){ try{w.close();}catch(_){} return false; }
+      w.postMessage({...message,type:"NIIMBOT_HANDOFF"},location.origin);
+      try{w.focus();}catch(_){}
+      return true;
+    } catch(_) { return false; }
   }
 
   async function relayShortcutToExistingTabIfRequested() {
@@ -973,39 +1004,26 @@
     const query=handoffPayloadFromParams(params);
     if (!query) return false;
     const requestId=uuid();
-
-    // v15 primary path: route through the Service Worker. This does not depend
-    // on BroadcastChannel/localStorage behaviour between Bluefy tabs and lets
-    // the SW focus an already open receiver tab when WebKit permits it.
-    const sw=await handoffServiceWorker();
-    if (sw) {
-      const swAck=new Promise(resolve=>{
-        swHandoffWaiters.set(requestId,resolve);
-        setTimeout(()=>{ if(swHandoffWaiters.delete(requestId)) resolve(false); },2200);
-      });
-      try { sw.postMessage({type:"HANDOFF_REQUEST",requestId,sourceTab:handoffTabId,query,ts:Date.now()}); } catch(_) {}
-      if (await swAck) {
-        status("An den bestehenden Bluefy-Drucktab übergeben. Die App versucht, diesen Tab wieder zu fokussieren.","ok");
-        document.title="Übergeben · NIIMBOT QR Label";
-        setTimeout(()=>{ try{ window.close(); }catch(_){} },250);
-        return true;
-      }
-    }
-
-    // Compatibility fallback for browsers where the Service Worker cannot
-    // route/focus windows. Kept for Android/desktop and older Bluefy builds.
-    const message={type:"handoff",requestId,sourceTab:handoffTabId,query,ts:Date.now()};
+    const candidate=bestReceiverFromStorage();
+    const message={type:"handoff",requestId,sourceTab:handoffTabId,query,ts:Date.now(),targetTab:candidate?.tabId||""};
     const ackPromise=new Promise(resolve=>{
       pendingHandoffAcks.set(requestId,resolve);
-      setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(false); },1400);
+      setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(null); },2200);
     });
+    tryDirectNamedHandoff(message);
     try { handoffChannel?.postMessage(message); } catch(_) {}
     try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(message)); } catch(_) {}
-    const acknowledged=await ackPromise;
-    if (!acknowledged) return false;
-    status("An den bereits offenen Bluefy-Drucktab übergeben. Falls Bluefy nicht automatisch zurückwechselt, diesen Hilfstab schließen.","ok");
+    if(candidate) setTimeout(()=>{
+      if(!pendingHandoffAcks.has(requestId)) return;
+      const broad={...message,targetTab:""};
+      try { handoffChannel?.postMessage(broad); } catch(_) {}
+      try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(broad)); } catch(_) {}
+    },700);
+    const ack=await ackPromise;
+    if (!ack) return false;
+    status(ack.connected?"An den verbundenen Bluefy-Drucktab übergeben. B1 bleibt verbunden.":"An den bereits offenen Bluefy-Drucktab übergeben.","ok");
     document.title="Übergeben · NIIMBOT QR Label";
-    setTimeout(()=>{ try{ window.close(); }catch(_){} },250);
+    try { window.close(); } catch(_) {}
     return true;
   }
 
@@ -1100,7 +1118,6 @@
         if(!dirty) location.reload();
       });
       if(reg.active) reg.active.postMessage({type:"GET_VERSION"});
-      await registerHandoffReceiverWithSW();
     }catch(e){ els.updateStatus.textContent="Service Worker Fehler"; }
   }
   function showUpdate(){ els.updateStatus.textContent=`v${APP_VERSION} · neue Version bereit`; els.updateBtn.classList.remove("hidden"); }
