@@ -1,4 +1,4 @@
-# Apple Kurzbefehle / Jira / Bluefy – v17
+# Apple Kurzbefehle / Jira / Bluefy – v18
 
 ## Empfohlener Handoff-Link
 
@@ -14,7 +14,7 @@ Die komplette Handoff-URL anschließend URL-codieren und über Bluefy öffnen:
 bluefy://open?url=ENCODED_HANDOFF_URL
 ```
 
-v17 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
+v18 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
 
 1. vorhandenen benannten Drucktab `niimbot-print` direkt finden → `postMessage` → `focus()`;
 2. Same-Origin `BroadcastChannel`;
@@ -74,6 +74,6 @@ https://USER.github.io/REPO/#handoff=1&url=https%3A%2F%2FmeineURL.com%2Fsecure%2
 
 ## Tab-Schließen
 
-Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v17 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
+Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v18 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
 
 Wenn Bluefy den Hilfstab trotzdem nicht entfernt, ist dies eine Host-App-/WKWebView-Grenze. Der Handoff selbst und die B1-Verbindung im alten Drucktab bleiben davon unabhängig.

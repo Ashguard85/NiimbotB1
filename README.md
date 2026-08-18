@@ -1,4 +1,4 @@
-# QR Label – Pages v17
+# QR Label – Pages v18
 
 Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels auf NIIMBOT B1/B1 Pro via Web Bluetooth. Für den Druck ist kein Backend notwendig.
 
@@ -8,7 +8,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 - Labelformate `50×30 mm` und `40×40 mm`.
 - B1/B1-Pro-Autoerkennung.
 - Direktdruck über Web Bluetooth, Dichte/Kopien/Offset, PNG/Share-Fallback.
-- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v17-Server-Provider.
+- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v18-Server-Provider.
 - Offline-App-Shell und kontrollierte Service-Worker-Updates.
 
 ## QuickChart-Beispiel
@@ -47,7 +47,7 @@ In Chrome/Edge die HTTPS-Seite öffnen, Bluetooth erlauben, B1 verbinden und dru
 
 ## Datenmodi
 - **Lokal:** IndexedDB, kein Backend erforderlich.
-- **Server:** HTTPS-API zu Docker v17; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
+- **Server:** HTTPS-API zu Docker v18; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
 - Kein Fake-Sync. Ein Moduswechsel wechselt nur den aktiven Datenspeicher.
 
 ## Backup
@@ -64,7 +64,7 @@ Restore akzeptiert v1 und v2. Cloudflare-Zugangsdaten werden nie exportiert.
 Siehe `SHORTCUTS.md`. Neu: `quickchart=`/`source=`, `label=40x40` und `captionpct=`.
 
 ## Update-Lifecycle
-Service-Worker-Cache: `qr-label-pwa-v17`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
+Service-Worker-Cache: `qr-label-pwa-v18`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
 
 ## Bekannte Grenzen
 - Direkter iOS-Druck braucht Bluefy oder einen anderen Web-BLE-Browser.
@@ -89,11 +89,11 @@ Der Upstream-Treiber `niimbot-web-bluetooth` lädt Bild-URLs intern über `fetch
 Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche BLE-Druck muss weiterhin mit realer B1-Hardware geprüft werden.
 
 
-## Bluefy-Handoff (v17)
+## Bluefy-Handoff (v18)
 
 Für Jira-/Kurzbefehle wird `handoff.html#url=...` empfohlen. Die Übergabe an einen bereits offenen Bluefy-Drucktab läuft ohne Service Worker über Named Window/`postMessage`, `BroadcastChannel` und `localStorage`-Fallback. Ein verbundener, frischer Drucktab wird bevorzugt. Der Drucktab wird nicht neu geladen, damit eine aktive B1-Verbindung erhalten bleiben kann. Details siehe `SHORTCUTS.md`.
 
-## v17 Handoff-Empfängerwahl
+## v18 Handoff-Empfängerwahl
 - Drucktabs senden jetzt alle 1,5 Sekunden einen lokalen Heartbeat.
 - `connected`, `visible` und `focused` werden getrennt erfasst; ein verbundener Tab hat immer Vorrang vor einem bloß sichtbaren Hilfstab.
 - Veraltete Registry-Einträge werden nach 90 Sekunden entfernt.

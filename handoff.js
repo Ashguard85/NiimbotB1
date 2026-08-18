@@ -76,7 +76,7 @@ function postAckHandler(m){
 }
 function complete(m={}){
   if(acked) return; acked=true;
-  setStatus(m.connected?"Label übernommen. Der verbundene Drucktab bleibt aktiv.":"Label an den bestehenden Drucktab übergeben.","ok");
+  setStatus(m.connected?"Label übernommen. Der verbundene Drucktab bleibt aktiv; Bluefy entscheidet, welcher Tab sichtbar bleibt.":"Label an den bestehenden Drucktab übergeben. Bluefy entscheidet, welcher Tab sichtbar bleibt.","ok");
   focusBtn.hidden=false; closeBtn.hidden=false;
   try{directTarget?.focus();}catch(_){}
   bestEffortClose();
@@ -123,7 +123,7 @@ function closeAttempt(){
 }
 function bestEffortClose(){
   closeTimers.forEach(clearTimeout); closeTimers=[];
-  [0,120,350,800,1500].forEach(ms=>closeTimers.push(setTimeout(()=>{if(!closeAttempt()&&ms===1500){setStatus("Label ist übergeben. Bluefy blockiert das automatische Schließen; mit „Zum Drucktab wechseln“ kannst du wenigstens direkt zurückspringen.","warn");}},ms)));
+  [0,120,350,800,1500].forEach(ms=>closeTimers.push(setTimeout(()=>{if(!closeAttempt()&&ms===1500){setStatus("Label ist übergeben. Bluefy blockiert das automatische Schließen bzw. Fokussieren. „Zum Drucktab wechseln“ startet noch einen Benutzer-gestützten Fokusversuch.","warn");}},ms)));
 }
 function focusExisting(){
   let ok=false;
@@ -134,7 +134,7 @@ function focusExisting(){
       if(marker){w.focus();ok=true;} else if(!directTarget){try{w.close();}catch(_){}}
     }
   }catch(_){}
-  if(!ok) setStatus("Bluefy konnte den bestehenden Tab nicht direkt fokussieren. Das Label ist trotzdem bereits dort angekommen.","warn");
+  if(!ok) setStatus("Bluefy hat den Fokuswechsel zum bestehenden Drucktab nicht zugelassen. Das Label ist dort trotzdem bereits angekommen und die BLE-Verbindung bleibt erhalten.","warn");
 }
 focusBtn.addEventListener("click",focusExisting);
 closeBtn.addEventListener("click",()=>{

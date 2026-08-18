@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "16";
+  const APP_VERSION = "18";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -902,7 +902,7 @@
       visible: document.visibilityState === "visible",
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : false,
       ts: Date.now(),
-      version: 17
+      version: 18
     };
     try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
     try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}

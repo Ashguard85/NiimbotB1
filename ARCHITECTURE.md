@@ -1,4 +1,4 @@
-# Architektur v17
+# Architektur v18
 
 ```text
 Gemeinsames Frontend
@@ -32,7 +32,7 @@ Der Service Worker ist **nicht** Bestandteil des Handoff-Protokolls. Er bleibt a
 
 Drucktabs registrieren lokal einen kurzlebigen Heartbeat mit `connected`/`visible`. So kann der Hilfstab bei mehreren Tabs den sinnvollsten Empfänger adressieren. Es werden keine Handoff-Daten an einen Server gesendet.
 
-## v17 Handoff-Empfängerwahl
+## v18 Handoff-Empfängerwahl
 - Drucktabs senden jetzt alle 1,5 Sekunden einen lokalen Heartbeat.
 - `connected`, `visible` und `focused` werden getrennt erfasst; ein verbundener Tab hat immer Vorrang vor einem bloß sichtbaren Hilfstab.
 - Veraltete Registry-Einträge werden nach 90 Sekunden entfernt.
