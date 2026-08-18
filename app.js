@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "25";
+  const APP_VERSION = "26";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;

@@ -11,6 +11,8 @@ const statusEl=document.getElementById("status");
 const focusBtn=document.getElementById("focusTab");
 const closeBtn=document.getElementById("closeTab");
 const diagEl=document.getElementById("diagnostics");
+const workingUi=document.getElementById("workingUi");
+const doneUi=document.getElementById("doneUi");
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():"handoff-"+Date.now()+"-"+Math.random().toString(16).slice(2);
 const helperTabId=uuid();
 let channel=null, acked=false, directTarget=null, closeTimers=[], lockKey="";
@@ -52,7 +54,7 @@ function diagnostics(){
   const receivers=[];
   if(storageOK){try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith(RECEIVER_PREFIX))continue;try{const v=JSON.parse(localStorage.getItem(k)||"{}");receivers.push(`${v.tabId||k.slice(RECEIVER_PREFIX.length)} connected=${!!v.connected} visible=${!!v.visible} focused=${!!v.focused} age=${Math.max(0,Math.round((Date.now()-(v.ts||0))/1000))}s`);}catch(_){}}}catch(_){}}
   return [
-    `Handoff-Handler: v25 transactional`,
+    `Handoff-Handler: v26 transactional`,
     `BroadcastChannel: ${"BroadcastChannel" in window?"ja":"nein"}`,
     `localStorage: ${storageOK?"ja":"nein"}`,
     `history.length: ${history.length}`,
@@ -135,9 +137,10 @@ function focusTarget(){
   return ok;
 }
 function settleHelper(){
-  // Keep the helper tiny and inert if Bluefy refuses to close it.
+  // Scrub all transferred label data from the helper URL and DOM.
   try{history.replaceState(null,"",location.pathname+"#done");}catch(_){}
-  document.title="Übergeben · NIIMBOT";
+  document.title="Label übernommen · NIIMBOT";
+  try{workingUi.hidden=true;doneUi.hidden=false;}catch(_){}
 }
 function bestEffortReturnAndClose(){
   closeTimers.forEach(clearTimeout); closeTimers=[];
@@ -147,8 +150,6 @@ function bestEffortReturnAndClose(){
     if(closeAttempt()) return;
     if(ms===2000){
       settleHelper();
-      setStatus("Label wurde sicher übernommen. Bluefy blockiert das automatische Schließen dieses extern erzeugten Tabs. Der verbundene Drucktab bleibt erhalten.","warn");
-      focusBtn.hidden=false; closeBtn.hidden=false;
     }
   },ms)));
 }
@@ -159,7 +160,7 @@ function postAckHandler(m){
   if(message.targetTab && m.receiverTab && m.receiverTab!==message.targetTab) return;
   if(acked) return;
   acked=true; releaseLock(requestId);
-  setStatus(m.connected?"Label vom verbundenen Drucktab bestätigt. Rückkehr wird versucht …":"Label vom Drucktab bestätigt. Rückkehr wird versucht …","ok");
+  settleHelper();
   bestEffortReturnAndClose();
 }
 

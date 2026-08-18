@@ -1,9 +1,9 @@
 "use strict";
-const CACHE_VERSION = "qr-label-pwa-v25";
+const CACHE_VERSION = "qr-label-pwa-v26";
 const CACHE = CACHE_VERSION;
 const APP_SHELL = [
-  "./","./index.html","./handoff.html","./handoff.css?v=25","./handoff.js?v=25","./app.css?v=25","./app.js?v=25","./storage.js?v=25","./providers.js?v=25","./printer.js?v=25",
-  "./manifest.webmanifest?v=25","./offline.html",
+  "./","./index.html","./handoff.html","./handoff.css?v=26","./handoff.js?v=26","./app.css?v=26","./app.js?v=26","./storage.js?v=26","./providers.js?v=26","./printer.js?v=26",
+  "./manifest.webmanifest?v=26","./offline.html",
   "./icons/favicon.png","./icons/apple-touch-icon.png","./icons/icon-192.png","./icons/icon-512.png","./icons/icon-maskable-512.png"
 ];
 const VENDOR = [

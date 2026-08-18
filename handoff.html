@@ -6,22 +6,29 @@
   <meta name="theme-color" content="#f7f9fc">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; connect-src 'self';">
   <title>NIIMBOT Übergabe</title>
-  <link rel="stylesheet" href="./handoff.css?v=22">
+  <link rel="stylesheet" href="./handoff.css?v=26">
 </head>
 <body>
-  <main class="card">
-    <div class="eyebrow">NIIMBOT B1</div>
-    <h1>Label übergeben</h1>
-    <p id="status">Bestehenden Drucktab suchen …</p>
-    <div class="actions">
-      <button id="focusTab" type="button" hidden>Zum Drucktab wechseln</button>
-      <button id="closeTab" class="secondary" type="button" hidden>Hilfstab schließen / zurück</button>
+  <main id="card" class="card">
+    <div id="workingUi">
+      <div class="eyebrow">NIIMBOT</div>
+      <h1>Label übergeben</h1>
+      <p id="status">Bestehenden Drucktab suchen …</p>
+      <div id="actions" class="actions">
+        <button id="focusTab" type="button" hidden>Zum Drucktab wechseln</button>
+        <button id="closeTab" class="secondary" type="button" hidden>Hilfstab schließen / zurück</button>
+      </div>
+      <details id="diagnosticsBox">
+        <summary>Bluefy-/Browser-Diagnose</summary>
+        <pre id="diagnostics">wird ermittelt …</pre>
+      </details>
     </div>
-    <details id="diagnosticsBox">
-      <summary>Bluefy-/Browser-Diagnose</summary>
-      <pre id="diagnostics">wird ermittelt …</pre>
-    </details>
+    <div id="doneUi" class="done" hidden>
+      <div class="done-mark" aria-hidden="true">✓</div>
+      <h1>Label übernommen</h1>
+      <p>Zurück zum Drucktab wechseln.</p>
+    </div>
   </main>
-  <script src="./handoff.js?v=22" defer></script>
+  <script src="./handoff.js?v=26" defer></script>
 </body>
 </html>

@@ -22,9 +22,13 @@
 - Bluefy/Safari-Handoff bleibt ohne Server-Endpunkt.
 
 
-## v25 Handoff-Handler
+## v26 Handoff-Handler
 - Transaktionale Handoff-Requests mit eindeutiger Request-ID und ACK des Ziel-Tabs.
 - Kurzer Lock pro Primary-Drucktab verhindert überlappende Übergaben.
 - Persistente per-Tab Inbox bleibt die Quelle der Wahrheit; BroadcastChannel/localStorage beschleunigen nur.
 - Rückkehr-/Close-Handler probiert Fokus und alle sicheren browserseitigen Close-Varianten erst nach bestätigter Übernahme.
 - Wenn Bluefy das Schließen verweigert, bleibt der Hilfstab inert; Drucktab und BLE-Verbindung bleiben unangetastet.
+
+
+## v26 Handoff-Abschluss
+Nach bestätigter Übergabe entfernt der Bluefy-Hilfstab alle Label-/Asset-Daten aus URL und Oberfläche und zeigt nur noch „Label übernommen – zurück zum Drucktab“. Automatische Close-/Focus-Versuche laufen still weiter; es werden keine weiteren Controls eingeblendet.
