@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "14";
+  const APP_VERSION = "15";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -974,7 +974,7 @@
     if (!query) return false;
     const requestId=uuid();
 
-    // v14 primary path: route through the Service Worker. This does not depend
+    // v15 primary path: route through the Service Worker. This does not depend
     // on BroadcastChannel/localStorage behaviour between Bluefy tabs and lets
     // the SW focus an already open receiver tab when WebKit permits it.
     const sw=await handoffServiceWorker();

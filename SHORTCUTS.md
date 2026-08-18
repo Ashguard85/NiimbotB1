@@ -1,8 +1,8 @@
-# Apple Kurzbefehle / Jira / Bluefy – v14
+# Apple Kurzbefehle / Jira / Bluefy – v15
 
 ## Empfohlen: `handoff.html` für bestehenden Drucktab
 
-Bluefy kann über `bluefy://open?url=...` eine URL öffnen. Ein dokumentierter Schalter für „bestehenden Tab ersetzen“ ist nicht bekannt. v14 verwendet deshalb einen kleinen Übergabe-Endpunkt.
+Bluefy kann über `bluefy://open?url=...` eine URL öffnen. Ein dokumentierter Schalter für „bestehenden Tab ersetzen“ ist nicht bekannt. v15 verwendet deshalb einen kleinen Übergabe-Endpunkt.
 
 1. NIIMBOT-App einmal normal in Bluefy öffnen und B1 verbinden.
 2. Jira/Shortcut öffnet **nicht** erneut die komplette App, sondern:
