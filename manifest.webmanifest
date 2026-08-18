@@ -1,7 +1,7 @@
 {
   "name": "QR Label – NIIMBOT B1",
   "short_name": "QR Label",
-  "description": "QR-Labels erstellen und NIIMBOT B1 direkt per Web Bluetooth drucken.",
+  "description": "QR-Labels erstellen und NIIMBOT-Drucker direkt per Web Bluetooth drucken; auf iPhone bevorzugt mit Safari + beacio.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

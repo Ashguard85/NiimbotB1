@@ -1,4 +1,4 @@
-# Architektur v18
+# Architektur v19
 
 ```text
 Gemeinsames Frontend
@@ -32,9 +32,18 @@ Der Service Worker ist **nicht** Bestandteil des Handoff-Protokolls. Er bleibt a
 
 Drucktabs registrieren lokal einen kurzlebigen Heartbeat mit `connected`/`visible`. So kann der Hilfstab bei mehreren Tabs den sinnvollsten Empfänger adressieren. Es werden keine Handoff-Daten an einen Server gesendet.
 
-## v18 Handoff-Empfängerwahl
+## v19 Handoff-Empfängerwahl
 - Drucktabs senden jetzt alle 1,5 Sekunden einen lokalen Heartbeat.
 - `connected`, `visible` und `focused` werden getrennt erfasst; ein verbundener Tab hat immer Vorrang vor einem bloß sichtbaren Hilfstab.
 - Veraltete Registry-Einträge werden nach 90 Sekunden entfernt.
 - Der Connected-Status gilt nur für das aktuelle Browserdokument und wird nicht über Reloads hinweg erfunden.
 - Weiterhin kein Server-/Handoff-Endpunkt erforderlich.
+
+
+## iOS BLE ab v19
+
+Bevorzugt: Safari → beacio Safari Extension → Standard `navigator.bluetooth` → NIIMBOT-Treiber.
+Fallback: Bluefy → Standard/Bridge-Web-Bluetooth → derselbe NIIMBOT-Treiber.
+Android/Desktop: natives Web Bluetooth.
+
+Es gibt bewusst keinen separaten beacio-Printer-Provider; die App bleibt auf der W3C-Web-Bluetooth-Oberfläche.

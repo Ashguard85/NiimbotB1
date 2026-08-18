@@ -60,11 +60,11 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v11 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     activeModel = MODELS[id];
 
-    // B1 + iOS/Bluefy: use the driver's conservative transport settings.
+    // B1 + iOS/CoreBluetooth: use the driver's conservative transport settings.
     // The upstream driver documents that CoreBluetooth may cap unacknowledged
     // writes around 182 bytes; B1 frame bundling defaults to 240 bytes.
     const ua = navigator.userAgent || "";
@@ -95,7 +95,7 @@
         installed = window[name] === value;
       } catch (_) {}
     }
-    if (!installed) throw new Error(`Bluefy-Kompatibilitätsadapter konnte window.${name} nicht temporär ersetzen.`);
+    if (!installed) throw new Error(`iOS-Kompatibilitätsadapter konnte window.${name} nicht temporär ersetzen.`);
     return () => {
       try {
         if (hadOwn && descriptor) Object.defineProperty(window, name, descriptor);
@@ -118,7 +118,7 @@
 
     // niimbot-web-bluetooth 2.4.0 expects an image URL and internally executes:
     // fetch(url) -> response.blob() -> createImageBitmap(blob) -> drawImage(...).
-    // Bluefy/WebKit can fail in that load/decode path with the generic "Load failed".
+    // iOS/WebKit can fail in that load/decode path with the generic "Load failed".
     // For printing we already HAVE the fully rendered canvas, so v11 bridges exactly
     // that one driver request back to this canvas. No URL is loaded, no Blob is decoded.
     const sentinelUrl = `https://niimbot-canvas.invalid/${Date.now()}-${Math.random().toString(36).slice(2)}`;

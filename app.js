@@ -1,12 +1,13 @@
 (() => {
   "use strict";
-  const APP_VERSION = "18";
+  const APP_VERSION = "19";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
   let mode = "local";
   let connected = false;
   let activePrinter = null;
+  let beacioReady = false;
   let waitingWorker = null;
   let dirty = false;
   let renderTimer;
@@ -762,7 +763,7 @@
       render(true);
       const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
       const derived = !activePrinter.size.validated ? ` ${activePrinter.size.w_mm}×${activePrinter.size.h_mm} ist eine abgeleitete Geometrie; Offset bei Bedarf feinjustieren.` : "";
-      const extra = ios && activePrinter.id===4096 ? " B1 + iOS/Bluefy bleibt ein Hardware-Testpunkt." : "";
+      const extra = ios && activePrinter.id===4096 ? ` B1 + iOS (${bluetoothEnvironmentLabel()}) bleibt ein Hardware-Testpunkt.` : "";
       status(`${activePrinter.name} erkannt. Bereit zum Drucken.${derived}${extra}`, activePrinter.size.validated ? "ok" : "warn");
       if (shortcutAutoprint && els.qrText.value.trim()) {
         shortcutAutoprint = false;
@@ -1114,11 +1115,56 @@
     return changed;
   }
 
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+
+  function isIOSSafari() {
+    if (!isIOS()) return false;
+    const ua = navigator.userAgent || "";
+    return /Safari/i.test(ua) && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(ua);
+  }
+
+  function bluetoothEnvironmentLabel() {
+    if (!isIOS()) return B1Printer.supported() ? "Natives Web Bluetooth" : "Kein Web Bluetooth";
+    if (window.BLENative) return "Bluefy / native BLE-Bridge";
+    if (beacioReady || window.beacioIOS || (isIOSSafari() && B1Printer.supported())) return "Safari + beacio";
+    return isIOSSafari() ? "Safari · beacio noch nicht aktiv" : "iOS-Browser ohne BLE-Bridge";
+  }
+
+  function updateBleBridgeStatus() {
+    if (!els.bleBridgeStatus) return;
+    const supported=B1Printer.supported();
+    const label=bluetoothEnvironmentLabel();
+    els.bleBridgeStatus.className=`inline-status ${supported ? "ok" : "neutral"}`;
+    els.bleBridgeStatus.innerHTML=`<span>${supported ? "✓" : "i"}</span><span>${label}${supported ? " · bereit für Geräteauswahl" : ""}</span>`;
+  }
+
   function browserMessage() {
-    const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
-    if(B1Printer.supported()) status(ios ? "Web Bluetooth ist verfügbar – wahrscheinlich über Bluefy/WebBLE. B1 einschalten und verbinden." : "Web Bluetooth verfügbar. B1 einschalten und verbinden.","ok");
-    else if(ios) status("iPhone/iPad erkannt: Safari/Chrome können den B1 nicht direkt ansprechen. Öffne diese Seite in Bluefy.","warn");
-    else status("Web Bluetooth nicht verfügbar. Verwende auf Android Chrome/Edge oder auf Desktop Chrome/Edge.","warn");
+    const ios=isIOS();
+    const supported=B1Printer.supported();
+    updateBleBridgeStatus();
+    if(supported) {
+      if(ios && isIOSSafari() && !window.BLENative) status("Safari + beacio: Web Bluetooth ist aktiv. B1 einschalten und verbinden.","ok");
+      else if(ios && window.BLENative) status("Bluefy: Web Bluetooth ist aktiv. B1 einschalten und verbinden.","ok");
+      else status("Web Bluetooth verfügbar. B1 einschalten und verbinden.","ok");
+    } else if(ios && isIOSSafari()) {
+      status("Safari erkannt. Aktiviere die beacio-Erweiterung und erlaube sie dauerhaft für diese Website. Danach Bluetooth erneut prüfen bzw. die Seite neu öffnen.","warn");
+    } else if(ios) {
+      status("iPhone/iPad erkannt: bevorzugt Safari + beacio verwenden; Bluefy bleibt als Fallback möglich.","warn");
+    } else {
+      status("Web Bluetooth nicht verfügbar. Verwende Android/Desktop mit Chrome oder Edge.","warn");
+    }
+  }
+
+  function installBeacioDetection() {
+    const ready=()=>{ beacioReady=true; browserMessage(); };
+    window.addEventListener("beacio:extension:ready", ready);
+    window.addEventListener("beacio:ready", ready);
+    // beacio injects navigator.bluetooth at document_start. With strict CSP the
+    // bridge may arrive asynchronously, so re-check briefly without any CDN SDK.
+    [150,500,1200,2200].forEach(ms=>setTimeout(browserMessage,ms));
   }
 
   async function registerSW() {
@@ -1147,12 +1193,13 @@
   }
 
   async function init() {
-    ["toast","statusBox","printerDot","connectBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     setupHandoffReceiver();
+    installBeacioDetection();
     await registerSW();
     if (await relayShortcutToExistingTabIfRequested()) return;
     els.appVersion.textContent="v"+APP_VERSION;

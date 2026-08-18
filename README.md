@@ -1,4 +1,4 @@
-# QR Label – Pages v18
+# QR Label – Pages v19
 
 Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels auf NIIMBOT B1/B1 Pro via Web Bluetooth. Für den Druck ist kein Backend notwendig.
 
@@ -8,7 +8,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 - Labelformate `50×30 mm` und `40×40 mm`.
 - B1/B1-Pro-Autoerkennung.
 - Direktdruck über Web Bluetooth, Dichte/Kopien/Offset, PNG/Share-Fallback.
-- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v18-Server-Provider.
+- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v19-Server-Provider.
 - Offline-App-Shell und kontrollierte Service-Worker-Updates.
 
 ## QuickChart-Beispiel
@@ -27,14 +27,17 @@ Für verschachtelte Ziel-URLs mit eigenen `&`-Parametern sollte `text=` URL-codi
 - `50×30`: B1 `384×240 px`, B1 Pro `584×354 px`; vom verwendeten Treiber hardwarevalidiert.
 - `40×40`: B1 `320×320 px`, B1 Pro `472×472 px`; aus der jeweiligen dpi-Geometrie abgeleitet und deshalb mit Testdruck/Offset zu kalibrieren.
 
-## iPhone / iPad
-Safari und Chrome auf iOS/iPadOS stellen Web Bluetooth nicht bereit. Für direkten BLE-Druck:
-1. Bluefy installieren und Bluetooth erlauben.
-2. Diese HTTPS-Seite in Bluefy öffnen und dort als Tab/Favorit behalten.
-3. B1 einschalten → `B1 verbinden` → B1 auswählen.
-4. QR/QuickChart-Link einfügen → Vorschau → `Drucken`.
+## iPhone / iPad – bevorzugt Safari + beacio
+beacio stellt in echtem Safari die Standard-Web-Bluetooth-API `navigator.bluetooth` bereit. Die App benötigt dafür keinen proprietären beacio-Code und keinen zusätzlichen Server.
 
-Eine PWA-Installation ist für diesen Bluefy-Druckweg nicht erforderlich.
+1. beacio installieren und einmal öffnen.
+2. In Safari die beacio-Erweiterung aktivieren.
+3. Für beacio **„Immer erlauben“ → „Auf jeder Website immer erlauben“** wählen.
+4. Diese GitHub-Pages-URL direkt in Safari öffnen.
+5. `B1 verbinden` tippen und den Drucker auswählen.
+6. Danach QR/Asset-Link übernehmen und drucken.
+
+Die App erkennt die spät injizierte beacio-Bridge auch unter der restriktiven CSP und aktualisiert den Bluetooth-Status automatisch. Bluefy bleibt als Fallback erhalten; für den bevorzugten Safari-Weg sind `bluefy://` und ein separater BLE-Browser nicht mehr nötig.
 
 ## Android
 In Chrome/Edge die HTTPS-Seite öffnen, Bluetooth erlauben, B1 verbinden und drucken. Optional kann die Seite als PWA installiert werden.
@@ -47,7 +50,7 @@ In Chrome/Edge die HTTPS-Seite öffnen, Bluetooth erlauben, B1 verbinden und dru
 
 ## Datenmodi
 - **Lokal:** IndexedDB, kein Backend erforderlich.
-- **Server:** HTTPS-API zu Docker v18; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
+- **Server:** HTTPS-API zu Docker v19; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
 - Kein Fake-Sync. Ein Moduswechsel wechselt nur den aktiven Datenspeicher.
 
 ## Backup
@@ -64,11 +67,11 @@ Restore akzeptiert v1 und v2. Cloudflare-Zugangsdaten werden nie exportiert.
 Siehe `SHORTCUTS.md`. Neu: `quickchart=`/`source=`, `label=40x40` und `captionpct=`.
 
 ## Update-Lifecycle
-Service-Worker-Cache: `qr-label-pwa-v18`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
+Service-Worker-Cache: `qr-label-pwa-v19`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
 
 ## Bekannte Grenzen
-- Direkter iOS-Druck braucht Bluefy oder einen anderen Web-BLE-Browser.
-- B1 + Bluefy sowie `40×40` konnten in dieser Build-Umgebung nicht mit echter Hardware getestet werden.
+- Direkter iOS-Druck: bevorzugt Safari + beacio; Bluefy bleibt Fallback.
+- B1 + Safari/beacio bzw. Bluefy sowie `40×40` konnten in dieser Build-Umgebung nicht mit echter Hardware getestet werden.
 - Die gepinnten QR-/NIIMBOT-JS-Bibliotheken werden weiterhin von UNPKG geladen und nach erfolgreichem Online-Start gecacht; sie sind noch nicht physisch vendort.
 
 
@@ -89,13 +92,21 @@ Der Upstream-Treiber `niimbot-web-bluetooth` lädt Bild-URLs intern über `fetch
 Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche BLE-Druck muss weiterhin mit realer B1-Hardware geprüft werden.
 
 
-## Bluefy-Handoff (v18)
+## Bluefy-Handoff (v19)
 
 Für Jira-/Kurzbefehle wird `handoff.html#url=...` empfohlen. Die Übergabe an einen bereits offenen Bluefy-Drucktab läuft ohne Service Worker über Named Window/`postMessage`, `BroadcastChannel` und `localStorage`-Fallback. Ein verbundener, frischer Drucktab wird bevorzugt. Der Drucktab wird nicht neu geladen, damit eine aktive B1-Verbindung erhalten bleiben kann. Details siehe `SHORTCUTS.md`.
 
-## v18 Handoff-Empfängerwahl
+## v19 Handoff-Empfängerwahl
 - Drucktabs senden jetzt alle 1,5 Sekunden einen lokalen Heartbeat.
 - `connected`, `visible` und `focused` werden getrennt erfasst; ein verbundener Tab hat immer Vorrang vor einem bloß sichtbaren Hilfstab.
 - Veraltete Registry-Einträge werden nach 90 Sekunden entfernt.
 - Der Connected-Status gilt nur für das aktuelle Browserdokument und wird nicht über Reloads hinweg erfunden.
 - Weiterhin kein Server-/Handoff-Endpunkt erforderlich.
+
+
+## Safari + beacio (v19)
+beacio ist ab v19 der bevorzugte iPhone-Weg. Laut Hersteller injiziert die Safari-Erweiterung `navigator.bluetooth` und `window.BluetoothUUID` direkt in HTTPS-Seiten. Unsere NIIMBOT-Integration bleibt deshalb auf der Standard-Web-Bluetooth-API und benötigt keinen beacio-spezifischen Printer-Provider.
+
+Die App bindet absichtlich **kein externes beacio-SDK** ein: die installierte Erweiterung kann bestehende Web-Bluetooth-Seiten ohne Codeänderung unterstützen. Wegen unserer strikten CSP kann die Injektion leicht verzögert ankommen; v19 hört deshalb auf `beacio:extension:ready`/`beacio:ready` und prüft `navigator.bluetooth` in den ersten Sekunden erneut.
+
+Bluefy-Handoff bleibt als Kompatibilitäts-/Fallbackweg enthalten.

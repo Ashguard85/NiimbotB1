@@ -1,6 +1,21 @@
-# Apple Kurzbefehle / Jira / Bluefy – v18
+# Apple Kurzbefehle / Jira / Safari + beacio / Bluefy – v19
 
-## Empfohlener Handoff-Link
+
+## Bevorzugter iPhone-Weg: Safari + beacio
+
+Mit beacio muss die Druckseite nicht mehr über `bluefy://` geöffnet werden. Für einen Asset-Link kann direkt die normale HTTPS-Adresse verwendet werden:
+
+```text
+https://Ashguard85.github.io/NiimbotB1/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345
+```
+
+Die App übernimmt beim Öffnen `url=...`, erzeugt den QR-Code und leitet bei passender Asset-URL die Caption ab. Der Druck läuft anschließend über `navigator.bluetooth`, das beacio in Safari bereitstellt.
+
+**Apple-Kurzbefehl (Safari/beacio):** Asset-URL übernehmen → URL-codieren → an `https://Ashguard85.github.io/NiimbotB1/#url=` anhängen → URL öffnen.
+
+Der folgende Bluefy-Handoff bleibt nur als Fallback erhalten.
+
+## Bluefy-Fallback: Handoff-Link
 
 Den NIIMBOT-Drucktab einmal normal in Bluefy öffnen und den B1 verbinden. Danach externe Jira-/Asset-Links über die kleine `handoff.html` öffnen:
 
@@ -14,7 +29,7 @@ Die komplette Handoff-URL anschließend URL-codieren und über Bluefy öffnen:
 bluefy://open?url=ENCODED_HANDOFF_URL
 ```
 
-v18 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
+v19 benötigt für die Übergabe **keinen Service Worker**. `handoff.html` versucht in dieser Reihenfolge:
 
 1. vorhandenen benannten Drucktab `niimbot-print` direkt finden → `postMessage` → `focus()`;
 2. Same-Origin `BroadcastChannel`;
@@ -74,6 +89,6 @@ https://USER.github.io/REPO/#handoff=1&url=https%3A%2F%2FmeineURL.com%2Fsecure%2
 
 ## Tab-Schließen
 
-Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v18 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
+Bluefy dokumentiert keinen Parameter wie `sameTab=1`, `newTab=0` oder `closeAfterOpen=1`. v19 versucht nach erfolgreicher Übergabe `window.close()`, den `_self`-Close-Weg sowie exakt benannte native Close-/Dismiss-Bridges, falls Bluefy sie tatsächlich exponiert. Bei einer Benutzeraktion wird zusätzlich `history.back()` als letzter Standard-Web-Fallback versucht.
 
 Wenn Bluefy den Hilfstab trotzdem nicht entfernt, ist dies eine Host-App-/WKWebView-Grenze. Der Handoff selbst und die B1-Verbindung im alten Drucktab bleiben davon unabhängig.
