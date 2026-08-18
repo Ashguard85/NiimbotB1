@@ -888,15 +888,24 @@
 
   function receiverStorageKey() { return HANDOFF_RECEIVER_PREFIX + handoffTabId; }
 
+  let handoffConnectedSince = 0;
   function updateHandoffReceiverState() {
-    try {
-      localStorage.setItem(receiverStorageKey(), JSON.stringify({
-        tabId: handoffTabId,
-        connected: !!connected,
-        visible: document.visibilityState === "visible",
-        ts: Date.now()
-      }));
-    } catch (_) {}
+    // Keep a short, explicit lease for this exact browser document.  The BLE
+    // connection itself lives in this document, therefore connected=true must
+    // never be inferred from another tab or persisted across a reload.
+    if (connected && !handoffConnectedSince) handoffConnectedSince = Date.now();
+    if (!connected) handoffConnectedSince = 0;
+    const state = {
+      tabId: handoffTabId,
+      connected: !!connected,
+      connectedSince: handoffConnectedSince || 0,
+      visible: document.visibilityState === "visible",
+      focused: typeof document.hasFocus === "function" ? document.hasFocus() : false,
+      ts: Date.now(),
+      version: 17
+    };
+    try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
+    try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}
   }
 
   function removeHandoffReceiverState() {
@@ -904,7 +913,7 @@
   }
 
   function sendHandoffAck(requestId, directSource=null) {
-    const ack={type:"ack",requestId,receiverTab:handoffTabId,connected:!!connected,ts:Date.now()};
+    const ack={type:"ack",requestId,receiverTab:handoffTabId,connected:!!connected,visible:document.visibilityState==="visible",focused:typeof document.hasFocus==="function"?document.hasFocus():false,ts:Date.now()};
     try { handoffChannel?.postMessage(ack); } catch(_) {}
     try { localStorage.setItem(HANDOFF_ACK_KEY, JSON.stringify(ack)); } catch(_) {}
     try { directSource?.postMessage({...ack,type:"NIIMBOT_HANDOFF_ACK"}, location.origin); } catch(_) {}
@@ -968,20 +977,30 @@
     });
     addEventListener("visibilitychange",updateHandoffReceiverState);
     addEventListener("pageshow",updateHandoffReceiverState);
+    addEventListener("focus",updateHandoffReceiverState);
+    addEventListener("blur",updateHandoffReceiverState);
     addEventListener("beforeunload",removeHandoffReceiverState);
-    setInterval(updateHandoffReceiverState,5000);
+    // Bluefy may keep several tabs alive. A short lease makes the currently
+    // running/connected receiver distinguishable without a server endpoint.
+    setInterval(updateHandoffReceiverState,1500);
   }
 
   function bestReceiverFromStorage() {
     const now=Date.now(); let best=null;
     try {
+      const stale=[];
       for(let i=0;i<localStorage.length;i++){
         const key=localStorage.key(i); if(!key?.startsWith(HANDOFF_RECEIVER_PREFIX)) continue;
-        let item; try{item=JSON.parse(localStorage.getItem(key)||"{}");}catch(_){continue;}
-        if(!item?.tabId || item.tabId===handoffTabId || now-(item.ts||0)>45000) continue;
-        const score=(item.connected?1000:0)+(item.visible?100:0)+Math.max(0,45-Math.floor((now-item.ts)/1000));
-        if(!best||score>best.score) best={...item,score};
+        let item; try{item=JSON.parse(localStorage.getItem(key)||"{}");}catch(_){stale.push(key);continue;}
+        const age=now-Number(item.ts||0);
+        if(!item?.tabId || age>90000){ stale.push(key); continue; }
+        if(item.tabId===handoffTabId) continue;
+        // Priority is intentionally lexicographic: connected > visible/focused > age.
+        // A recently connected background tab must beat a visible but unconnected helper.
+        const score=(item.connected?1000000:0)+(item.focused?10000:0)+(item.visible?5000:0)+Math.max(0,90000-age);
+        if(!best||score>best.score) best={...item,ageMs:age,score};
       }
+      for(const key of stale) try{localStorage.removeItem(key);}catch(_){}
     } catch(_) {}
     return best;
   }

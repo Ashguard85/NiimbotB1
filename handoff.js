@@ -34,7 +34,7 @@ function diagnostics(){
     try{
       for(let i=0;i<localStorage.length;i++){
         const k=localStorage.key(i); if(!k?.startsWith(RECEIVER_PREFIX)) continue;
-        try{const v=JSON.parse(localStorage.getItem(k)||"{}");receivers.push(`${v.tabId||k.slice(RECEIVER_PREFIX.length)} connected=${!!v.connected} visible=${!!v.visible} age=${Math.max(0,Math.round((Date.now()-(v.ts||0))/1000))}s`);}catch(_){}
+        try{const v=JSON.parse(localStorage.getItem(k)||"{}");receivers.push(`${v.tabId||k.slice(RECEIVER_PREFIX.length)} connected=${!!v.connected} visible=${!!v.visible} focused=${!!v.focused} age=${Math.max(0,Math.round((Date.now()-(v.ts||0))/1000))}s`);}catch(_){}
       }
     }catch(_){}
   }
@@ -53,15 +53,18 @@ function refreshDiagnostics(){diagEl.textContent=diagnostics();}
 
 function receiverCandidate(){
   if(!storageOK) return null;
-  const now=Date.now(); let best=null;
+  const now=Date.now(); let best=null; const stale=[];
   try{
     for(let i=0;i<localStorage.length;i++){
       const k=localStorage.key(i); if(!k?.startsWith(RECEIVER_PREFIX)) continue;
-      let v; try{v=JSON.parse(localStorage.getItem(k)||"{}");}catch(_){continue;}
-      if(!v?.tabId || now-(v.ts||0)>45000) continue;
-      const score=(v.connected?1000:0)+(v.visible?100:0)+Math.max(0,45-Math.floor((now-v.ts)/1000));
-      if(!best||score>best.score) best={...v,score};
+      let v; try{v=JSON.parse(localStorage.getItem(k)||"{}");}catch(_){stale.push(k);continue;}
+      const age=now-Number(v.ts||0);
+      if(!v?.tabId || age>90000){stale.push(k);continue;}
+      // connected always wins; then focused/visible; age only breaks ties.
+      const score=(v.connected?1000000:0)+(v.focused?10000:0)+(v.visible?5000:0)+Math.max(0,90000-age);
+      if(!best||score>best.score) best={...v,ageMs:age,score};
     }
+    for(const k of stale) try{localStorage.removeItem(k);}catch(_){}
   }catch(_){}
   return best;
 }
