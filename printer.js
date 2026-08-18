@@ -34,6 +34,8 @@
   const chooserModel = { id:4096, name_prefixes:["B1"], task:"b1", density:3, label_type:1, speed:1, dpi:203 };
   let activeModel = MODELS[4096];
   let activeSizeKey = "40x40";
+  let activeDevice = null;
+  const PREFERRED_DEVICE_KEY = "niimbotPreferredDeviceV1";
 
   function supported() {
     return !!(window.Niimbot && typeof Niimbot.isSupported === "function" && Niimbot.isSupported());
@@ -72,32 +74,83 @@
     return isIOS() && !isBluefy() && !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
   }
 
-  function installRequestDeviceOverride(onStage, {allDevices=false}={}) {
-    if (!shouldUseNeutralChooser()) return () => {};
-    const bt = navigator.bluetooth;
-    const original = bt.requestDevice;
-    if (typeof original !== "function") return () => {};
+  function readPreferredDevice() {
+    try { return JSON.parse(localStorage.getItem(PREFERRED_DEVICE_KEY) || "null"); } catch (_) { return null; }
+  }
 
-    const neutral = async function(options = {}) {
-      const optionalServices = Array.isArray(options.optionalServices) ? options.optionalServices : [];
-      onStage?.({ stage:"chooser", detail:"Neutraler beacio-Gerätewähler geöffnet" });
-      const chooserOptions = allDevices
-        ? { acceptAllDevices:true }
-        : { filters: NIIMBOT_NAME_PREFIXES.map(namePrefix => ({namePrefix})) };
-      const device = await original.call(bt, {
-        ...chooserOptions,
-        ...(optionalServices.length ? { optionalServices } : {})
-      });
+  function rememberDevice(device) {
+    if (!device) return;
+    activeDevice = device;
+    try {
+      localStorage.setItem(PREFERRED_DEVICE_KEY, JSON.stringify({
+        id: device.id || "",
+        name: device.name || "",
+        ts: Date.now()
+      }));
+    } catch (_) {}
+  }
+
+  function forgetPreferredDevice() {
+    try { localStorage.removeItem(PREFERRED_DEVICE_KEY); } catch (_) {}
+  }
+
+  async function findRememberedDevice(onStage) {
+    const bt = navigator.bluetooth;
+    if (!bt || typeof bt.getDevices !== "function") return null;
+    const pref = readPreferredDevice();
+    if (!pref) return null;
+    onStage?.({ stage:"known-search", detail:"Bekannter NIIMBOT wird gesucht" });
+    let devices = [];
+    try { devices = await bt.getDevices(); }
+    catch (e) {
+      onStage?.({ stage:"known-unavailable", detail:`Bekannte Geräte konnten nicht gelesen werden: ${e.message || e}` });
+      return null;
+    }
+    const byId = pref.id ? devices.find(d => d && d.id === pref.id) : null;
+    const byName = !byId && pref.name ? devices.find(d => d && d.name === pref.name) : null;
+    const device = byId || byName || null;
+    if (device) onStage?.({ stage:"known-found", detail:device.name || "Bekannter NIIMBOT gefunden", device });
+    else onStage?.({ stage:"known-missing", detail:"Bekannter NIIMBOT ist in getDevices() nicht vorhanden" });
+    return device;
+  }
+
+  function installRequestDeviceOverride(onStage, {allDevices=false, forcedDevice=null}={}) {
+    const bt = navigator.bluetooth;
+    if (!bt || typeof bt.requestDevice !== "function") return () => {};
+    const original = bt.requestDevice;
+    const useNeutral = shouldUseNeutralChooser();
+
+    const wrapped = async function(options = {}) {
+      if (forcedDevice) {
+        onStage?.({ stage:"known-selected", detail:forcedDevice.name || "Bekannter NIIMBOT", device:forcedDevice });
+        rememberDevice(forcedDevice);
+        return forcedDevice;
+      }
+
+      let requestOptions = options;
+      if (useNeutral) {
+        const optionalServices = Array.isArray(options.optionalServices) ? options.optionalServices : [];
+        onStage?.({ stage:"chooser", detail:"beacio-Gerätewähler geöffnet" });
+        const chooserOptions = allDevices
+          ? { acceptAllDevices:true }
+          : { filters: NIIMBOT_NAME_PREFIXES.map(namePrefix => ({namePrefix})) };
+        requestOptions = {
+          ...chooserOptions,
+          ...(optionalServices.length ? { optionalServices } : {})
+        };
+      }
+      const device = await original.call(bt, requestOptions);
+      rememberDevice(device);
       onStage?.({ stage:"selected", detail: device?.name || "Bluetooth-Gerät gewählt", device });
       return device;
     };
 
     let restored = false;
-    try { bt.requestDevice = neutral; } catch (_) {}
-    if (bt.requestDevice !== neutral) {
-      try { Object.defineProperty(bt, "requestDevice", { configurable:true, writable:true, value:neutral }); } catch (_) {}
+    try { bt.requestDevice = wrapped; } catch (_) {}
+    if (bt.requestDevice !== wrapped) {
+      try { Object.defineProperty(bt, "requestDevice", { configurable:true, writable:true, value:wrapped }); } catch (_) {}
     }
-    if (bt.requestDevice !== neutral) throw new Error("beacio-Gerätewähler konnte nicht aktiviert werden.");
+    if (bt.requestDevice !== wrapped) throw new Error("Bluetooth-Gerätewähler konnte nicht vorbereitet werden.");
 
     return () => {
       if (restored) return; restored = true;
@@ -108,38 +161,78 @@
     };
   }
 
-  async function connect(opts={}) {
-    if (!window.Niimbot) throw new Error("NIIMBOT-Treiber wurde nicht geladen.");
-    if (!supported()) throw new Error("Dieser Browser stellt kein Web Bluetooth bereit.");
+  async function connectOnce(opts={}, forcedDevice=null) {
     const onStage = typeof opts.onStage === "function" ? opts.onStage : null;
     let restoreChooser = () => {};
     try {
-      restoreChooser = installRequestDeviceOverride(onStage, {allDevices:!!opts.allDevices});
+      restoreChooser = installRequestDeviceOverride(onStage, {allDevices:!!opts.allDevices, forcedDevice});
       onStage?.({ stage:"identify", detail:"NIIMBOT-Erkennung wird gestartet" });
       const info = await Niimbot.identify(chooserModel);
       onStage?.({ stage:"identified", detail:"NIIMBOT-Gerät erkannt", info });
       const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
-    if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
-    }
-    activeModel = MODELS[id];
-
-    // B1 + iOS/CoreBluetooth: use the driver's conservative transport settings.
-    // The upstream driver documents that CoreBluetooth may cap unacknowledged
-    // writes around 182 bytes; B1 frame bundling defaults to 240 bytes.
-    const ios = isIOS();
-    if (activeModel.id === 4096) {
-      if ("PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
-      if (ios) {
-        if ("WRITE_MODE" in Niimbot) Niimbot.WRITE_MODE = "paced";
-        if ("BUNDLE_MAX" in Niimbot) Niimbot.BUNDLE_MAX = 180;
+      if (!MODELS[id]) {
+        throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
       }
-    }
-      onStage?.({ stage:"connected", detail:`${activeModel.name} verbunden`, printer:current() });
+      activeModel = MODELS[id];
+
+      const ios = isIOS();
+      if (activeModel.id === 4096) {
+        if ("PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
+        if (ios) {
+          if ("WRITE_MODE" in Niimbot) Niimbot.WRITE_MODE = "paced";
+          if ("BUNDLE_MAX" in Niimbot) Niimbot.BUNDLE_MAX = 180;
+        }
+      }
+      if (forcedDevice) rememberDevice(forcedDevice);
+      onStage?.({ stage:"connected", detail:`${activeModel.name} verbunden`, printer:current(), device:activeDevice });
       return current();
     } finally {
       restoreChooser();
     }
+  }
+
+  async function connect(opts={}) {
+    if (!window.Niimbot) throw new Error("NIIMBOT-Treiber wurde nicht geladen.");
+    if (!supported()) throw new Error("Dieser Browser stellt kein Web Bluetooth bereit.");
+    const onStage = typeof opts.onStage === "function" ? opts.onStage : null;
+
+    if (opts.preferKnown && !opts.allDevices) {
+      const known = await findRememberedDevice(onStage);
+      if (known) {
+        try {
+          return await connectOnce(opts, known);
+        } catch (e) {
+          onStage?.({ stage:"known-failed", detail:`Automatische Verbindung fehlgeschlagen: ${e.message || e}` });
+          activeDevice = null;
+          if (opts.knownOnly) throw e;
+          forgetPreferredDevice();
+        }
+      } else if (opts.knownOnly) {
+        throw new Error("Kein bereits freigegebener NIIMBOT über navigator.bluetooth.getDevices() gefunden.");
+      }
+    }
+    return connectOnce(opts, null);
+  }
+
+  async function connectKnown(opts={}) {
+    return connect({...opts, preferKnown:true, knownOnly:true});
+  }
+
+  async function disconnect() {
+    const device = activeDevice;
+    try {
+      if (device?.gatt?.connected) device.gatt.disconnect();
+    } catch (_) {}
+    activeDevice = null;
+    return true;
+  }
+
+  function preferredDevice() {
+    return readPreferredDevice();
+  }
+
+  function canReconnectKnown() {
+    return !!(navigator.bluetooth && typeof navigator.bluetooth.getDevices === "function" && readPreferredDevice());
   }
 
   function installGlobalOverride(name, value) {
@@ -226,5 +319,5 @@
     }
   }
 
-  window.B1Printer = { supported, connect, printCanvas, current, setSize, MODELS, LABEL_PRESETS };
+  window.B1Printer = { supported, connect, connectKnown, disconnect, preferredDevice, canReconnectKnown, printCanvas, current, setSize, MODELS, LABEL_PRESETS };
 })();

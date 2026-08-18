@@ -1,3 +1,13 @@
+# v27 – Known-device Reconnect Test
+
+- `navigator.bluetooth.getDevices()` wird genutzt, um einen bereits freigegebenen NIIMBOT in einem neuen Tab wiederzufinden.
+- Der bekannte Drucker wird anhand Geräte-ID, ersatzweise Name, ausgewählt und ohne erneuten Chooser an den NIIMBOT-Treiber übergeben.
+- Der normale Verbinden-Button versucht zuerst den bekannten Drucker; „Alle Bluetooth-Geräte anzeigen“ erzwingt weiterhin den manuellen Chooser.
+- Bei URL-/Shortcut-Start mit QR-Inhalt wird ein bekannter Drucker automatisch wiederverbunden, wenn die Option aktiviert ist.
+- Neue Optionen: „Bekannten Drucker automatisch verbinden“ und „Nach erfolgreichem Druck trennen“, beide standardmäßig aktiv.
+- Nach bestätigtem Druck wartet die App 800 ms und trennt anschließend GATT, damit ein neuer Tab den Drucker übernehmen kann.
+- UI-/Asset-/Service-Worker-Version auf v27 angehoben.
+
 # v22
 
 - Safari/beacio: nur der tatsächlich verbundene Drucktab besitzt den Fensternamen `niimbot-print`.

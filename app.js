@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "26";
+  const APP_VERSION = "27";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -785,18 +785,26 @@
     } catch(e) { if(e.name!=="AbortError") status("PDF konnte nicht erstellt werden: "+e.message,"error"); }
   }
 
-  async function connectPrinter({allDevices=false}={}) {
+  async function connectPrinter({allDevices=false,preferKnown=true,knownOnly=false,automatic=false}={}) {
     try {
       els.connectBtn.disabled=true; status("Bluetooth-Verbindung wird vorbereitet …","info");
-      activePrinter=await B1Printer.connect({allDevices,onStage:(ev)=>{
+      activePrinter=await B1Printer.connect({allDevices,preferKnown,knownOnly,onStage:(ev)=>{
         if(!ev || !ev.stage) return;
-        if(ev.stage==="chooser") { beginBleChooserUi(); status(allDevices?"Alle Bluetooth-Geräte werden angezeigt …":"NIIMBOT-Geräteauswahl geöffnet …","info"); }
+        if(ev.stage==="known-search") status("Bekannter NIIMBOT wird gesucht …","info");
+        else if(ev.stage==="known-found") status(`Bekannter Drucker gefunden: ${ev.detail}. Verbindung wird wiederhergestellt …`,"info");
+        else if(ev.stage==="known-selected") status(`Bekannter Drucker: ${ev.detail}. Verbinde direkt …`,"info");
+        else if(ev.stage==="known-missing") status("Kein bereits freigegebener NIIMBOT gefunden.","warn");
+        else if(ev.stage==="known-unavailable") status(ev.detail,"warn");
+        else if(ev.stage==="known-failed") status(ev.detail,"warn");
+        else if(ev.stage==="chooser") { beginBleChooserUi(); status(allDevices?"Alle Bluetooth-Geräte werden angezeigt …":"NIIMBOT-Geräteauswahl geöffnet …","info"); }
         else if(ev.stage==="selected") { endBleChooserUi(); status(`Gerät gewählt: ${ev.detail || "Bluetooth-Gerät"}. NIIMBOT-Kompatibilität wird geprüft …`,"info"); }
-        else if(ev.stage==="identify") status("NIIMBOT-Treiber wird vorbereitet …","info");
+        else if(ev.stage==="identify") status(automatic?"Automatische NIIMBOT-Verbindung wird geprüft …":"NIIMBOT-Treiber wird vorbereitet …","info");
         else if(ev.stage==="identified") status("NIIMBOT erkannt – Verbindung wird abgeschlossen …","info");
       }});
       activePrinter=B1Printer.setSize(els.labelSize.value);
       setConnected(true, activePrinter.name.replace("NIIMBOT ","")+" verbunden");
+      const remembered = B1Printer.preferredDevice?.();
+      if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = remembered ? `Bekannter Drucker: ${remembered.name || activePrinter.name}` : `Bekannter Drucker: ${activePrinter.name}`;
       updateGeometryUi({resetOffset:false});
       render(true);
       const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -809,7 +817,7 @@
       }
     } catch(e) {
       setConnected(false);
-      status("Verbindung fehlgeschlagen: "+e.message,"error");
+      status((automatic?"Automatische Verbindung nicht möglich: ":"Verbindung fehlgeschlagen: ")+e.message, automatic?"warn":"error");
     } finally {
       endBleChooserUi();
       els.connectBtn.disabled=false;
@@ -836,7 +844,17 @@
         label_size:els.labelSize.value, copies:Number(els.copies.value), density:Number(els.density.value), created_at:now()
       };
       try { await provider.addHistory(entry); await refreshLists(); } catch(_){}
-      status("Druckauftrag vom Drucker bestätigt.","ok"); toast("Gedruckt");
+      const disconnectAfter = !!els.disconnectAfterPrint?.checked;
+      if (disconnectAfter) {
+        status("Druckauftrag bestätigt. Bluetooth wird getrennt …","info");
+        await new Promise(r=>setTimeout(r,800));
+        try { await B1Printer.disconnect(); } catch (_) {}
+        setConnected(false, "B1 verbinden");
+        status("Druck abgeschlossen · Bluetooth getrennt. Der nächste Tab kann den bekannten Drucker direkt wieder verbinden.","ok");
+        toast("Gedruckt · getrennt");
+      } else {
+        status("Druckauftrag vom Drucker bestätigt.","ok"); toast("Gedruckt");
+      }
     } catch(e) {
       const msg = String(e && e.message || e || "Unbekannter Fehler");
       if (/load failed/i.test(msg)) {
@@ -1325,7 +1343,7 @@
   }
 
   async function init() {
-    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","disconnectAfterPrint","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
@@ -1358,6 +1376,10 @@
     els.offsetY.value=await LocalStore.getSetting("offsetY",printerGeometry().size.offset_y_px ?? 0);
     updateCaptionScaleUi(); updateModeUi(); updateGeometryUi(); updateParamPanel(); setPreviewZoom(1);
     await loadProvider();
+    els.autoReconnectKnown.checked = await LocalStore.getSetting("autoReconnectKnown", true);
+    els.disconnectAfterPrint.checked = await LocalStore.getSetting("disconnectAfterPrint", true);
+    const pref = B1Printer.preferredDevice?.();
+    if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = pref ? `Bekannter Drucker: ${pref.name || "NIIMBOT"}` : "Noch kein bekannter Drucker gespeichert";
 
     ["qrText","caption","ecc","invert","captionScale"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; updateCaptionScaleUi(); render(); }));
     els.qrText.addEventListener("input",()=>{ LocalStore.setSetting("draftQr",els.qrText.value); setImportStatus(false); });
@@ -1399,8 +1421,10 @@
     els.scanCancelBtn.addEventListener("click",stopScanner);
     els.scanPhotoFallbackBtn.addEventListener("click",()=>{ stopScanner(); els.scanImageInput.click(); });
     els.scanModal.addEventListener("click",e=>{ if(e.target===els.scanModal) stopScanner(); });
-    els.connectBtn.addEventListener("click",connectPrinter);
-    els.connectAllBtn?.addEventListener("click",()=>connectPrinter({allDevices:true}));
+    els.connectBtn.addEventListener("click",()=>connectPrinter({preferKnown:true}));
+    els.connectAllBtn?.addEventListener("click",()=>connectPrinter({allDevices:true,preferKnown:false}));
+    els.autoReconnectKnown?.addEventListener("change",()=>LocalStore.setSetting("autoReconnectKnown",els.autoReconnectKnown.checked));
+    els.disconnectAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("disconnectAfterPrint",els.disconnectAfterPrint.checked));
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",shareQrTarget);
     els.savePngBtn.addEventListener("click",savePngSmart);
@@ -1423,8 +1447,11 @@
     render(true); browserMessage();
     if (shortcutApplied) {
       if (shortcutNotice) status(shortcutNotice,"warn");
-      else if (shortcutAutoprint) status("Kurzbefehl übernommen. B1 verbinden – danach startet der Druck automatisch.","ok");
+      else if (shortcutAutoprint) status("Kurzbefehl übernommen. Bekannter NIIMBOT wird wenn möglich automatisch verbunden.","ok");
       else status("Kurzbefehl übernommen. Vorschau ist druckbereit.","ok");
+    }
+    if (!connected && els.autoReconnectKnown?.checked && els.qrText.value.trim() && B1Printer.canReconnectKnown?.()) {
+      await connectPrinter({preferKnown:true,knownOnly:true,automatic:true});
     }
     await refreshLists();
     addEventListener("hashchange",()=>applyShortcutParams({announce:true}));

@@ -14,3 +14,7 @@ body.ble-choosing .page-shell,body.ble-choosing footer,body.ble-choosing .toast{
 body.ble-choosing .topbar{position:relative!important;min-height:72px;box-shadow:none}
 body.ble-choosing .top-actions{display:none!important}
 body.ble-choosing::after{content:"Bluetooth-Gerät auswählen …";display:block;padding:18px 20px 10px;color:#475467;font-weight:700;font-size:16px}
+
+/* v27: known-device reconnect controls */
+.printer-options{display:grid;gap:.55rem;margin-top:.7rem;padding:.75rem;border:1px solid var(--line,#dfe3e8);border-radius:14px;background:rgba(255,255,255,.55)}
+.toggle-option{display:flex;align-items:flex-start;gap:.65rem;cursor:pointer}.toggle-option input{margin-top:.2rem;width:1.15rem;height:1.15rem;flex:0 0 auto}.toggle-option span{display:grid;gap:.12rem}.toggle-option strong{font-size:.92rem}.toggle-option small,.known-printer-info{font-size:.78rem;color:var(--muted,#667085)}.known-printer-info{padding-top:.25rem;border-top:1px solid var(--line,#dfe3e8)}

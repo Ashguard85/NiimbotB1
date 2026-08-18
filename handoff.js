@@ -54,7 +54,7 @@ function diagnostics(){
   const receivers=[];
   if(storageOK){try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k?.startsWith(RECEIVER_PREFIX))continue;try{const v=JSON.parse(localStorage.getItem(k)||"{}");receivers.push(`${v.tabId||k.slice(RECEIVER_PREFIX.length)} connected=${!!v.connected} visible=${!!v.visible} focused=${!!v.focused} age=${Math.max(0,Math.round((Date.now()-(v.ts||0))/1000))}s`);}catch(_){}}}catch(_){}}
   return [
-    `Handoff-Handler: v26 transactional`,
+    `Handoff-Handler: v27 transactional`,
     `BroadcastChannel: ${"BroadcastChannel" in window?"ja":"nein"}`,
     `localStorage: ${storageOK?"ja":"nein"}`,
     `history.length: ${history.length}`,
