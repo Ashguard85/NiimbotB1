@@ -15,3 +15,8 @@ Gemeinsames Frontend
 Der Druckpfad ist unabhängig vom Data Provider und bleibt immer auf dem Endgerät. QuickChart wird nur als Eingabeformat verstanden; die App muss den Bilddienst zum Rendern nicht aufrufen.
 
 `50x30` verwendet die im NIIMBOT-Treiber veröffentlichten Modellgeometrien. `40x40` ist eine bewusst als abgeleitet markierte benutzerdefinierte Geometrie und kann über `offset` bzw. die UI feinjustiert werden.
+
+
+## Bluefy Tab-Handoff
+
+Same-Origin `BroadcastChannel` plus `storage`-Event-Fallback überträgt externe Jira-/QR-Parameter an einen bereits offenen Drucktab. Die Druckseite selbst wird dabei nicht navigiert; BLE/GATT-Zustand bleibt im bestehenden Dokument.

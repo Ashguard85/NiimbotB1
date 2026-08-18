@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "11";
+  const APP_VERSION = "13";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -25,6 +25,19 @@
   let nativeQrDetector = undefined;
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
+
+  // v12 Bluefy handoff: an externally opened Bluefy tab can pass the new
+  // Jira/QR payload to an already open NIIMBOT tab. The existing document
+  // stays alive, so an active Web-Bluetooth/GATT connection can be retained.
+  const HANDOFF_CHANNEL_NAME = "niimbot-qr-handoff-v1";
+  const HANDOFF_STORAGE_KEY = "niimbotQrHandoffV1";
+  const HANDOFF_ACK_KEY = "niimbotQrHandoffAckV1";
+  const handoffTabId = sessionStorage.getItem("niimbotHandoffTabId") || uuid();
+  sessionStorage.setItem("niimbotHandoffTabId", handoffTabId);
+  const handledHandoffs = new Set();
+  const pendingHandoffAcks = new Map();
+  let handoffChannel = null;
+
   const now = () => new Date().toISOString();
   const validLabelSizes = new Set(Object.keys(B1Printer.LABEL_PRESETS || {"40x40":1,"50x30":1}));
 
@@ -764,7 +777,7 @@
     try {
       dirty=true; els.printBtn.disabled=true; els.connectBtn.disabled=true;
       status("Druckbild wird direkt aus dem Canvas vorbereitet …","info");
-      // v11 prints the already rendered canvas directly through a Bluefy compatibility
+      // v12 prints the already rendered canvas directly through a Bluefy compatibility
       // bridge. The NIIMBOT driver's URL -> fetch -> Blob -> createImageBitmap path is
       // bypassed completely for this one print.
       await render(true);
@@ -782,7 +795,7 @@
     } catch(e) {
       const msg = String(e && e.message || e || "Unbekannter Fehler");
       if (/load failed/i.test(msg)) {
-        status("Druckfehler: Load failed trotz direktem Canvas-Pfad. Das kommt in v11 nicht mehr vom Laden des Druckbilds; bitte Verbindung trennen, B1 neu einschalten und erneut verbinden. Fehlerdetails: "+msg,"error");
+        status("Druckfehler: Load failed trotz direktem Canvas-Pfad. Beim direkten Canvas-Pfad kommt das nicht vom Laden des Druckbilds; bitte Verbindung trennen, B1 neu einschalten und erneut verbinden. Fehlerdetails: "+msg,"error");
       } else {
         status("Druckfehler: "+msg+" – falls bereits Papier ausgegeben wurde, Druckbild prüfen.","error");
       }
@@ -859,6 +872,92 @@
     catch(e){ status("Server nicht erreichbar: "+e.message,"error"); }
   }
 
+  function truthyParam(value) {
+    return ["1","true","yes","ja","on"].includes(String(value||"").toLowerCase());
+  }
+
+  function handoffPayloadFromParams(params) {
+    const copy = new URLSearchParams(params);
+    copy.delete("handoff");
+    copy.delete("relay");
+    return copy.toString();
+  }
+
+  function sendHandoffAck(requestId) {
+    const ack={type:"ack",requestId,receiverTab:handoffTabId,ts:Date.now()};
+    try { handoffChannel?.postMessage(ack); } catch(_) {}
+    try { localStorage.setItem(HANDOFF_ACK_KEY, JSON.stringify(ack)); } catch(_) {}
+  }
+
+  async function receiveHandoff(message) {
+    if (!message || message.type!=="handoff" || !message.requestId || message.sourceTab===handoffTabId) return;
+    if (handledHandoffs.has(message.requestId)) { sendHandoffAck(message.requestId); return; }
+    handledHandoffs.add(message.requestId);
+    try {
+      const params=new URLSearchParams(message.query||"");
+      const changed=await applyShortcutParams({announce:true,paramsOverride:params});
+      if (changed) {
+        toast("Jira/QR-Link aus Bluefy übernommen");
+        if (connected) status("Neues Label im bestehenden Drucker-Tab übernommen. B1 bleibt verbunden.","ok");
+      }
+    } finally {
+      sendHandoffAck(message.requestId);
+      if (handledHandoffs.size>50) handledHandoffs.delete(handledHandoffs.values().next().value);
+    }
+  }
+
+  function receiveHandoffAck(message) {
+    if (!message || message.type!=="ack" || !message.requestId || message.receiverTab===handoffTabId) return;
+    const resolve=pendingHandoffAcks.get(message.requestId);
+    if (resolve) { pendingHandoffAcks.delete(message.requestId); resolve(true); }
+  }
+
+  function setupHandoffReceiver() {
+    if ("BroadcastChannel" in window) {
+      try {
+        handoffChannel=new BroadcastChannel(HANDOFF_CHANNEL_NAME);
+        handoffChannel.addEventListener("message",e=>{
+          const m=e.data;
+          if(m?.type==="handoff") receiveHandoff(m);
+          else if(m?.type==="ack") receiveHandoffAck(m);
+        });
+      } catch(_) { handoffChannel=null; }
+    }
+    addEventListener("storage",e=>{
+      if(e.key===HANDOFF_STORAGE_KEY && e.newValue){ try{ receiveHandoff(JSON.parse(e.newValue)); }catch(_){} }
+      if(e.key===HANDOFF_ACK_KEY && e.newValue){ try{ receiveHandoffAck(JSON.parse(e.newValue)); }catch(_){} }
+    });
+  }
+
+  async function relayShortcutToExistingTabIfRequested() {
+    const params=shortcutParams();
+    if (!truthyParam(params.get("handoff") ?? params.get("relay"))) return false;
+    const query=handoffPayloadFromParams(params);
+    if (!query) return false;
+    const requestId=uuid();
+    const message={type:"handoff",requestId,sourceTab:handoffTabId,query,ts:Date.now()};
+    const ackPromise=new Promise(resolve=>{
+      pendingHandoffAcks.set(requestId,resolve);
+      setTimeout(()=>{ if(pendingHandoffAcks.delete(requestId)) resolve(false); },1200);
+    });
+    try { handoffChannel?.postMessage(message); } catch(_) {}
+    try { localStorage.setItem(HANDOFF_STORAGE_KEY,JSON.stringify(message)); } catch(_) {}
+    const acknowledged=await ackPromise;
+    if (!acknowledged) return false;
+
+    // The Bluefy scheme does not expose a documented "reuse this tab" flag.
+    // If Bluefy opened a temporary tab, try to close it after the existing
+    // NIIMBOT tab acknowledged the payload. If WebKit refuses window.close(),
+    // the user only needs to close this handoff tab; no printer reconnect.
+    status("An den bereits offenen Bluefy-Drucktab übergeben. Die bestehende B1-Verbindung bleibt erhalten.","ok");
+    document.title="Übergeben · NIIMBOT QR Label";
+    setTimeout(()=>{ try{ window.close(); }catch(_){} },180);
+    setTimeout(()=>{
+      if(!document.hidden) status("Übergeben. Falls dieser Tab offen bleibt, einfach schließen – das Label liegt im bestehenden Drucker-Tab bereit.","ok");
+    },700);
+    return true;
+  }
+
   function shortcutParams() {
     const merged = new URLSearchParams(location.search);
     let hash = location.hash.startsWith("#") ? location.hash.slice(1) : location.hash;
@@ -872,9 +971,9 @@
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
   }
 
-  async function applyShortcutParams({announce=true}={}) {
+  async function applyShortcutParams({announce=true,paramsOverride=null}={}) {
     shortcutNotice = "";
-    const params = shortcutParams();
+    const params = paramsOverride instanceof URLSearchParams ? paramsOverride : shortcutParams();
     if (![...params.keys()].length) return false;
     let changed = false;
 
@@ -965,6 +1064,8 @@
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
+    setupHandoffReceiver();
+    if (await relayShortcutToExistingTabIfRequested()) return;
     els.appVersion.textContent="v"+APP_VERSION;
     els.qrText.value=await LocalStore.getSetting("draftQr","");
     els.sourceInput.value=await LocalStore.getSetting("draftSource",els.qrText.value);

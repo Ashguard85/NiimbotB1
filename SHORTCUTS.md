@@ -1,55 +1,90 @@
-# Apple Kurzbefehle / URL-API – v7
+# Apple Kurzbefehle / Jira / Bluefy – v13
+
+## Wichtig: bestehenden Bluefy-Drucktab wiederverwenden
+
+Bluefy unterstützt nach einer von PNN Soft genannten Entwicklerauskunft das Schema:
+
+```text
+bluefy://open?url=...
+```
+
+Ein dokumentierter Parameter wie `sameTab=1` oder `newTab=0` ist dafür nicht bekannt. Seit v12 löst die App das deshalb auf App-Ebene: Mit `handoff=1` übergibt ein von Bluefy neu geöffneter Hilfstab den Jira-/QR-Inhalt an einen **bereits offenen NIIMBOT-Tab derselben GitHub-Pages-Origin**. Dieser bestehende Tab wird nicht neu geladen; dadurch kann eine aktive B1-Web-Bluetooth-Verbindung erhalten bleiben.
+
+Ablauf:
+
+```text
+Jira / Kurzbefehl
+  → bluefy://open?url=<PWA-URL mit handoff=1>
+  → Bluefy öffnet ggf. einen Hilfstab
+  → Hilfstab sendet Parameter an bestehenden NIIMBOT-Tab
+  → bestehender Tab aktualisiert QR + Caption ohne Reload
+  → B1-Verbindung bleibt bestehen
+  → Hilfstab versucht sich zu schließen
+```
+
+Wenn iOS/Bluefy das automatische Schließen verhindert, den Hilfstab einfach schließen und zum bereits offenen NIIMBOT-Tab wechseln. Ein erneutes Verbinden ist dann nicht nötig, solange Bluefy die BLE-Verbindung beim App-/Tabwechsel nicht selbst getrennt hat.
+
+## Jira-Beispiel
+
+Ziel-Asset:
+
+```text
+https://meineURL.com/secure/ShowObject.jspa?id=43322
+```
+
+PWA-Handoff-URL:
+
+```text
+https://USER.github.io/REPO/#handoff=1&url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D43322
+```
+
+Diese komplette PWA-URL anschließend noch einmal URL-codieren und an Bluefy übergeben:
+
+```text
+bluefy://open?url=ENCODED_PWA_URL
+```
+
+In Apple Kurzbefehle ist das robusteste Vorgehen:
+
+1. Jira-URL als Eingabe übernehmen.
+2. Jira-URL URL-codieren.
+3. `https://USER.github.io/REPO/#handoff=1&url=` + codierte Jira-URL zusammensetzen.
+4. Die komplette PWA-URL erneut URL-codieren.
+5. `bluefy://open?url=` + codierte PWA-URL zusammensetzen.
+6. „URLs öffnen“ ausführen.
 
 ## Direkter QR-Inhalt
-
-Bevorzugt als URL-Fragment:
 
 ```text
 https://USER.github.io/REPO/#qr=https%3A%2F%2Fexample.com%2Fkunde%2F123&caption=IAM-43322&label=40x40&autoprint=1
 ```
 
 Unterstützt:
+- `url` – Jira-/Asset-URL; automatische Asset-Caption kann daraus z. B. `IAM-43322` bilden
 - `qr` – QR-Inhalt
-- `caption` oder aus Kompatibilitätsgründen `text` – Beschriftung
+- `caption` oder `text` – Beschriftung
+- `quickchart` / `source` – vollständiger QuickChart-QR-Link
 - `label` oder `size` – `50x30` oder `40x40`
 - `copies` – 1 bis 20
 - `density` – 1 bis 5
 - `offset` – -60 bis +60 Pixel
 - `ecc` – L, M, Q oder H
-- `captionpct` – Caption-Schriftgröße in Prozent der Labelbreite; `0` = Auto
-- `autoprint=1` – nach erfolgreicher Bluetooth-Auswahl direkt drucken
+- `captionpct` – Caption-Größe in Prozent der Labelbreite; `0` = Auto
+- `autoprint=1` – bei bestehender Verbindung direkt drucken; sonst nach der notwendigen Bluetooth-Auswahl
+- `handoff=1` – an einen bereits offenen NIIMBOT-Tab weiterreichen, statt dort die Seite neu zu laden
 
-## QuickChart-Link übergeben
-
-Der vollständige QuickChart-Link wird URL-codiert in `quickchart=` oder `source=` übergeben:
-
-```text
-https://USER.github.io/REPO/#quickchart=QUICKCHART_URL_ENCODED&label=40x40&autoprint=1
-```
-
-Beispiel-QuickChart-Quelle:
+## QuickChart-Link
 
 ```text
-https://quickchart.io/qr?text=https%3A%2F%2Fsupport.braendi.ch%2Fsecure%2FShowObject.jspa%3Fid%3D43322&size=500&caption=IAM-43322&captionFontSize=40
+https://USER.github.io/REPO/#quickchart=QUICKCHART_URL_ENCODED&label=40x40&handoff=1
 ```
 
-Die Web-App liest den Link lokal aus. `text` wird zum QR-Inhalt, `caption` zur Beschriftung, `ecLevel` zur Fehlerkorrektur. Wenn sowohl `size` als auch `captionFontSize` vorhanden sind, wird deren Verhältnis als Caption-Größe übernommen. Das physische Label wird ausschließlich durch `label=50x30` bzw. `label=40x40` festgelegt.
+Beispielquelle:
 
-Sonderzeichen in der inneren `text=`-URL sollten wie von QuickChart empfohlen URL-codiert sein. Insbesondere bei inneren URLs mit eigenen `&`-Parametern ist Encoding nötig, damit QuickChart-Optionen und Ziel-URL eindeutig bleiben.
+```text
+https://quickchart.io/qr?text=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D43322&size=500&caption=IAM-43322&captionFontSize=40
+```
 
-## iPhone / iPad
+## Datenschutz
 
-Für den direkten B1-Druck muss die Seite in einem Web-Bluetooth-fähigen Browser wie Bluefy laufen. Safari/Chrome auf iOS stellen Web Bluetooth nicht bereit. Ein offizielles, von Bluefy dokumentiertes Deep-Link-Schema wird in diesem Projekt nicht vorausgesetzt; die Druckseite kann dauerhaft als Tab/Favorit in Bluefy genutzt werden.
-
-## Autoprint
-
-Browser dürfen die erstmalige Bluetooth-Geräteauswahl nicht ohne Benutzeraktion öffnen. `autoprint=1` bedeutet daher:
-1. Vorschau sofort erzeugen,
-2. `B1 verbinden` antippen und Drucker auswählen, falls noch nicht verbunden,
-3. direkt danach automatisch drucken.
-
-
-### Jira-/Assets-Link direkt übergeben
-`#url=https%3A%2F%2Fsupport.braendi.ch%2Fsecure%2FShowObject.jspa%3Fid%3D43322`
-
-Bei aktivierter automatischer Asset-Caption wird daraus standardmäßig `IAM-43322`.
+Für QR-/Jira-Inhalte wird das URL-Fragment (`#...`) bevorzugt. Fragmente werden beim normalen HTTP-Abruf nicht an GitHub Pages übertragen. Beim Bluefy-Deep-Link liegt der Inhalt allerdings in der lokal an iOS/Bluefy übergebenen Deep-Link-URL.

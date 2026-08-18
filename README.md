@@ -1,4 +1,4 @@
-# QR Label – Pages v7
+# QR Label – Pages v13
 
 Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels auf NIIMBOT B1/B1 Pro via Web Bluetooth. Für den Druck ist kein Backend notwendig.
 
@@ -8,7 +8,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 - Labelformate `50×30 mm` und `40×40 mm`.
 - B1/B1-Pro-Autoerkennung.
 - Direktdruck über Web Bluetooth, Dichte/Kopien/Offset, PNG/Share-Fallback.
-- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v7-Server-Provider.
+- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v13-Server-Provider.
 - Offline-App-Shell und kontrollierte Service-Worker-Updates.
 
 ## QuickChart-Beispiel
@@ -16,7 +16,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 Einfach diesen Typ URL in das Feld einfügen:
 
 ```text
-https://quickchart.io/qr?text=https://support.braendi.ch/secure/ShowObject.jspa?id=43322&size=500&caption=IAM-43322&captionFontSize=40
+https://quickchart.io/qr?text=https://meineURL.com/secure/ShowObject.jspa?id=43322&size=500&caption=IAM-43322&captionFontSize=40
 ```
 
 Die App ersetzt die Eingabe automatisch durch das eigentliche QR-Ziel und übernimmt `IAM-43322` als Caption. `captionFontSize=40` wird relativ zu `size=500` als 8 % der Labelbreite interpretiert. Es wird **kein QuickChart-Bild heruntergeladen**; QR und Caption werden lokal gerendert.
@@ -47,7 +47,7 @@ In Chrome/Edge die HTTPS-Seite öffnen, Bluetooth erlauben, B1 verbinden und dru
 
 ## Datenmodi
 - **Lokal:** IndexedDB, kein Backend erforderlich.
-- **Server:** HTTPS-API zu Docker v7; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
+- **Server:** HTTPS-API zu Docker v13; Druck bleibt trotzdem lokal Endgerät → Bluetooth → B1.
 - Kein Fake-Sync. Ein Moduswechsel wechselt nur den aktiven Datenspeicher.
 
 ## Backup
@@ -64,7 +64,7 @@ Restore akzeptiert v1 und v2. Cloudflare-Zugangsdaten werden nie exportiert.
 Siehe `SHORTCUTS.md`. Neu: `quickchart=`/`source=`, `label=40x40` und `captionpct=`.
 
 ## Update-Lifecycle
-Service-Worker-Cache: `qr-label-pwa-v7`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
+Service-Worker-Cache: `qr-label-pwa-v13`. Neue Versionen werden vorbereitet und nicht mitten in laufenden Aktionen erzwungen. Kein unkontrollierter `controllerchange`-Reload-Loop.
 
 ## Bekannte Grenzen
 - Direkter iOS-Druck braucht Bluefy oder einen anderen Web-BLE-Browser.
@@ -82,8 +82,13 @@ Ab v7 startet die App mit **40×40 mm**. Der Button **PDF** erzeugt eine einseit
 **Offline lokal** benötigt keinen QuickChart-Zugriff. QR und Caption werden vollständig im Browser erzeugt. Die Caption sitzt in v7 näher am QR-Code. Im Modus **Auto** wird ein erkannter QuickChart-Link online über QuickChart gerendert; offline fällt die App lokal zurück. Auch im expliziten QuickChart-Modus erfolgt bei Timeout, Netzwerk- oder CORS-Fehler ein lokaler Fallback statt eines leeren Labels.
 
 
-## iOS/Bluefy Drucktransport (v11)
+## iOS/Bluefy Drucktransport (v12)
 
-Der Upstream-Treiber `niimbot-web-bluetooth` lädt Bild-URLs intern über `fetch(url) -> blob() -> createImageBitmap()`. Bluefy kann genau an dieser Lade-/Decodierstufe mit `Load failed` abbrechen. v11 übergibt deshalb keine Bild-URL mehr: Die App hält das fertige Label bereits als Canvas vor und verwendet beim Druck einen eng begrenzten Kompatibilitätsadapter, der genau den internen Bildabruf des Treibers auf dieses Canvas zurückführt. Dadurch gibt es für den eigentlichen Druck weder einen `data:`-/`blob:`-Fetch noch eine Bilddecodierung. Nach dem Druck werden die temporären Global-Overrides sofort wiederhergestellt.
+Der Upstream-Treiber `niimbot-web-bluetooth` lädt Bild-URLs intern über `fetch(url) -> blob() -> createImageBitmap()`. Bluefy kann genau an dieser Lade-/Decodierstufe mit `Load failed` abbrechen. v12 übergibt deshalb keine Bild-URL mehr: Die App hält das fertige Label bereits als Canvas vor und verwendet beim Druck einen eng begrenzten Kompatibilitätsadapter, der genau den internen Bildabruf des Treibers auf dieses Canvas zurückführt. Dadurch gibt es für den eigentlichen Druck weder einen `data:`-/`blob:`-Fetch noch eine Bilddecodierung. Nach dem Druck werden die temporären Global-Overrides sofort wiederhergestellt.
 
 Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche BLE-Druck muss weiterhin mit realer B1-Hardware geprüft werden.
+
+
+## Bluefy-Handoff (v12)
+
+Mit `#handoff=1&url=...` kann ein extern geöffneter Bluefy-Hilfstab den neuen Jira-/QR-Inhalt an einen bereits offenen NIIMBOT-Tab derselben Origin übergeben. Der bestehende Tab wird dabei nicht neu geladen, sodass eine aktive B1-Verbindung erhalten bleiben kann. Details siehe `SHORTCUTS.md`.
