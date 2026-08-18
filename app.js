@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "21";
+  const APP_VERSION = "22";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -60,11 +60,12 @@
 
   function setConnected(on, label) {
     connected = on;
+    try { window.name = on ? PRINT_WINDOW_NAME : `niimbot-tab-${handoffTabId}`; } catch (_) {}
     els.printerDot.classList.toggle("ok", on);
     els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
     try {
-      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:21}));
+      if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:22}));
       else {
         const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
         if(primary.tabId===handoffTabId) localStorage.removeItem(PRIMARY_PRINTER_TAB_KEY);
@@ -940,11 +941,11 @@
       visible: document.visibilityState === "visible",
       focused: typeof document.hasFocus === "function" ? document.hasFocus() : false,
       ts: Date.now(),
-      version: 21
+      version: 22
     };
     try { localStorage.setItem(receiverStorageKey(), JSON.stringify(state)); } catch (_) {}
     if (connected) {
-      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:21})); } catch (_) {}
+      try { localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:22})); } catch (_) {}
     }
     try { handoffChannel?.postMessage({type:"receiver-state", ...state}); } catch (_) {}
   }
@@ -992,7 +993,7 @@
     const relayParams=shortcutParams();
     const isRelay=truthyParam(relayParams.get("handoff") ?? relayParams.get("relay"));
     if (!isRelay) {
-      try { window.name=PRINT_WINDOW_NAME; } catch(_) {}
+      try { window.name=`niimbot-tab-${handoffTabId}`; } catch(_) {}
       try { window.__NIIMBOT_HANDOFF_RECEIVER__=true; } catch(_) {}
       updateHandoffReceiverState();
     }
@@ -1063,13 +1064,31 @@
     } catch(_) { return false; }
   }
 
+  function hasIncomingLabelShortcut(params=shortcutParams()) {
+    return ["url","qr","quickchart","source","caption","text"].some(k=>params.has(k));
+  }
+
+  function connectedPrimaryReceiver() {
+    const now=Date.now();
+    try {
+      const primary=JSON.parse(localStorage.getItem(PRIMARY_PRINTER_TAB_KEY)||"{}");
+      if(!primary.tabId || primary.tabId===handoffTabId || now-Number(primary.ts||0)>90000) return null;
+      const receiver=JSON.parse(localStorage.getItem(HANDOFF_RECEIVER_PREFIX+primary.tabId)||"{}");
+      if(receiver.tabId===primary.tabId && receiver.connected && now-Number(receiver.ts||0)<90000) return receiver;
+    } catch(_) {}
+    return null;
+  }
+
   async function relayShortcutToExistingTabIfRequested() {
     const params=shortcutParams();
-    if (!truthyParam(params.get("handoff") ?? params.get("relay"))) return false;
+    const explicitRelay=truthyParam(params.get("handoff") ?? params.get("relay"));
+    const primary=connectedPrimaryReceiver();
+    const automaticSafariRelay=isIOSSafari() && hasIncomingLabelShortcut(params) && !!primary;
+    if (!explicitRelay && !automaticSafariRelay) return false;
     const query=handoffPayloadFromParams(params);
     if (!query) return false;
     const requestId=uuid();
-    const candidate=bestReceiverFromStorage();
+    const candidate=primary || bestReceiverFromStorage();
     const message={type:"handoff",requestId,sourceTab:handoffTabId,query,ts:Date.now(),targetTab:candidate?.tabId||""};
     const ackPromise=new Promise(resolve=>{
       pendingHandoffAcks.set(requestId,resolve);
@@ -1086,7 +1105,7 @@
     },700);
     const ack=await ackPromise;
     if (!ack) return false;
-    status(ack.connected?"An den verbundenen Bluefy-Drucktab übergeben. B1 bleibt verbunden.":"An den bereits offenen Bluefy-Drucktab übergeben.","ok");
+    status(ack.connected?"An den verbundenen Drucktab übergeben. B1 bleibt verbunden.":"An den bereits offenen Drucktab übergeben.","ok");
     document.title="Übergeben · NIIMBOT QR Label";
     try { window.close(); } catch(_) {}
     return true;
