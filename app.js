@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "9";
+  const APP_VERSION = "10";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -763,13 +763,21 @@
     if(!qr || !connected) return;
     try {
       dirty=true; els.printBtn.disabled=true; els.connectBtn.disabled=true;
-      await render(true);
-      status("Druckdaten werden übertragen …","info");
-      const dataUrl=els.labelCanvas.toDataURL("image/png");
-      await B1Printer.print(dataUrl,{
-        density:Number(els.density.value), copies:Number(els.copies.value), offsetY:Number(els.offsetY.value),
-        onProgress:(s)=>status(typeof s==="string" ? s : "Druck läuft …","info")
-      });
+      status("Druckbild wird vorbereitet …","info");
+      // Bluefy/WebKit can fail on fetch(data:...) inside the NIIMBOT driver with
+      // the generic error "Load failed". Use a short-lived blob: URL instead.
+      // This also avoids turning a potentially large 40×40 canvas into a base64 string.
+      const printBlob = await canvasBlob();
+      const printUrl = URL.createObjectURL(printBlob);
+      try {
+        status("Druckdaten werden übertragen …","info");
+        await B1Printer.print(printUrl,{
+          density:Number(els.density.value), copies:Number(els.copies.value), offsetY:Number(els.offsetY.value),
+          onProgress:(s)=>status(typeof s==="string" ? s : "Druck läuft …","info")
+        });
+      } finally {
+        URL.revokeObjectURL(printUrl);
+      }
       const entry={
         id:uuid(), qr_text:qr, caption:els.caption.value.trim(), printer:activePrinter?.name || "NIIMBOT",
         label_size:els.labelSize.value, copies:Number(els.copies.value), density:Number(els.density.value), created_at:now()
@@ -777,7 +785,12 @@
       try { await provider.addHistory(entry); await refreshLists(); } catch(_){}
       status("Druckauftrag vom Drucker bestätigt.","ok"); toast("Gedruckt");
     } catch(e) {
-      status("Druckfehler: "+e.message+" – falls bereits Papier ausgegeben wurde, Druckbild prüfen.","error");
+      const msg = String(e && e.message || e || "Unbekannter Fehler");
+      if (/load failed/i.test(msg)) {
+        status("Druckfehler: Bluefy konnte das Druckbild nicht laden. v10 verwendet dafür bereits den stabileren Blob-Weg; Seite neu laden und erneut verbinden.","error");
+      } else {
+        status("Druckfehler: "+msg+" – falls bereits Papier ausgegeben wurde, Druckbild prüfen.","error");
+      }
     } finally {
       dirty=false; els.connectBtn.disabled=false; els.printBtn.disabled=!connected || !els.qrText.value.trim();
     }

@@ -80,3 +80,8 @@ Ab v7 startet die App mit **40×40 mm**. Der Button **PDF** erzeugt eine einseit
 **QuickChart API** erzeugt das QR-Bild über `https://quickchart.io/qr`. Bei importierten QuickChart-Links übernimmt die App insbesondere `text`, `caption`, `captionFontSize`, `size`, `ecLevel`, `margin` sowie unterstützte Farb-/Stilparameter. Das fertige PNG wird anschließend auf das gewählte physische Label skaliert und genau dieser Canvas wird gedruckt bzw. als PNG/PDF exportiert.
 
 **Offline lokal** benötigt keinen QuickChart-Zugriff. QR und Caption werden vollständig im Browser erzeugt. Die Caption sitzt in v7 näher am QR-Code. Im Modus **Auto** wird ein erkannter QuickChart-Link online über QuickChart gerendert; offline fällt die App lokal zurück. Auch im expliziten QuickChart-Modus erfolgt bei Timeout, Netzwerk- oder CORS-Fehler ein lokaler Fallback statt eines leeren Labels.
+
+
+## iOS/Bluefy Drucktransport (v10)
+
+v10 übergibt das gerenderte Label als `blob:`-URL an den NIIMBOT-Treiber. Das vermeidet den auf Bluefy beobachteten `Load failed`-Fehler bei `fetch(data:...)`. Beim B1 werden auf iOS zusätzlich `WRITE_MODE=paced` und `BUNDLE_MAX=180` gesetzt. Der tatsächliche Druck muss weiterhin mit realer B1-Hardware geprüft werden.

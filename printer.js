@@ -60,10 +60,23 @@
     const info = await Niimbot.identify(chooserModel);
     const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
     if (!MODELS[id]) {
-      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v7 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+      throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser v10 nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
     }
     activeModel = MODELS[id];
-    if (activeModel.id === 4096 && "PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
+
+    // B1 + iOS/Bluefy: use the driver's conservative transport settings.
+    // The upstream driver documents that CoreBluetooth may cap unacknowledged
+    // writes around 182 bytes; B1 frame bundling defaults to 240 bytes.
+    const ua = navigator.userAgent || "";
+    const ios = /iPad|iPhone|iPod/i.test(ua) ||
+      (navigator.platform === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+    if (activeModel.id === 4096) {
+      if ("PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
+      if (ios) {
+        if ("WRITE_MODE" in Niimbot) Niimbot.WRITE_MODE = "paced";
+        if ("BUNDLE_MAX" in Niimbot) Niimbot.BUNDLE_MAX = 180;
+      }
+    }
     return current();
   }
 
