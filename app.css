@@ -18,3 +18,7 @@ body.ble-choosing::after{content:"Bluetooth-Gerät auswählen …";display:block
 /* v28: known-device reconnect controls */
 .printer-options{display:grid;gap:.55rem;margin-top:.7rem;padding:.75rem;border:1px solid var(--line,#dfe3e8);border-radius:14px;background:rgba(255,255,255,.55)}
 .toggle-option{display:flex;align-items:flex-start;gap:.65rem;cursor:pointer}.toggle-option input{margin-top:.2rem;width:1.15rem;height:1.15rem;flex:0 0 auto}.toggle-option span{display:grid;gap:.12rem}.toggle-option strong{font-size:.92rem}.toggle-option small,.known-printer-info{font-size:.78rem;color:var(--muted,#667085)}.known-printer-info{padding-top:.25rem;border-top:1px solid var(--line,#dfe3e8)}
+
+.field-block.is-disabled { opacity: .58; }
+.field-block.is-disabled input { cursor: not-allowed; }
+.inline-status.warn { border-color: rgba(183,121,31,.35); background: rgba(183,121,31,.08); }

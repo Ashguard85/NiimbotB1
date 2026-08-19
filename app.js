@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "31";
+  const APP_VERSION = "33";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -135,6 +135,46 @@
     return fs;
   }
 
+  function quietZoneModules() {
+    return Math.max(0, Math.min(8, Math.round(Number(els.quietZone?.value ?? 4) || 0)));
+  }
+
+  function updateQuietZoneUi() {
+    if (!els.quietZone) return;
+    const q = quietZoneModules();
+    if (els.quietZoneOut) els.quietZoneOut.textContent = `${q} ${q===1 ? "Modul" : "Module"}`;
+    if (els.quietZoneInfo) {
+      if (q >= 4) {
+        els.quietZoneInfo.className = "inline-status neutral";
+        els.quietZoneInfo.innerHTML = `<span>✓</span><span>${q===4 ? "Standard-Ruheraum" : "Großer Ruheraum"} · ${q} Module</span>`;
+      } else {
+        els.quietZoneInfo.className = "inline-status warn";
+        els.quietZoneInfo.innerHTML = `<span>!</span><span>Reduzierter Ruheraum · ${q} Module. Mehr QR-Fläche, aber geringere Scan-Reserve.</span>`;
+      }
+    }
+    if (els.quietZoneBlock) {
+      const local = activeRenderMode() === "local";
+      els.quietZoneBlock.classList.toggle("is-disabled", !local);
+      els.quietZone.disabled = !local;
+      els.quietZone.title = local ? "" : "Der QR-Ruheraum wird nur vom Offline-Renderer verwendet.";
+    }
+  }
+
+  function subcaptionFontPx(canvas, mainCaptionFont=0) {
+    const base = mainCaptionFont > 0 ? mainCaptionFont : Math.max(12, Math.round(canvas.width * 0.065));
+    return Math.max(9, Math.min(Math.round(canvas.height * 0.16), Math.round(base * 0.72)));
+  }
+
+  function fitTextFont(ctx, text, startPx, minPx, maxWidth, weight=700) {
+    let fs = Math.max(minPx, Math.round(startPx));
+    ctx.font = `${weight} ${fs}px Arial, Helvetica, sans-serif`;
+    while (fs > minPx && ctx.measureText(text).width > maxWidth) {
+      fs--;
+      ctx.font = `${weight} ${fs}px Arial, Helvetica, sans-serif`;
+    }
+    return fs;
+  }
+
   function activeRenderMode() {
     const selected = els.renderMode?.value || "auto";
     if (selected === "local") return "local";
@@ -194,23 +234,31 @@
     } finally { setTimeout(()=>URL.revokeObjectURL(objectUrl),1000); }
   }
 
-  function drawLocalLabel(ctx, c, text, caption) {
+  function drawLocalLabel(ctx, c, text, caption, subcaption) {
     if (!window.qrcode) throw new Error("QR-Bibliothek nicht geladen.");
     const qr = qrcode(0, els.ecc.value);
     qr.addData(text, "Byte");
     qr.make();
     const n = qr.getModuleCount();
     const margin = Math.max(6, Math.round(c.width * 0.025));
-    let fs = caption ? captionFontPx(c, caption) : 0;
-    const gap = caption ? Math.max(1, Math.round(fs * 0.06)) : 0;
-    const captionLineH = caption ? Math.ceil(fs * 1.08) : 0;
-    const maxQr = Math.min(c.width - margin*2, c.height - margin*2 - captionLineH - gap);
-    const modulePx = Math.max(1, Math.floor(maxQr / (n + 8)));
+
+    let mainFs = caption ? captionFontPx(c, caption) : 0;
+    let subFs = subcaption ? subcaptionFontPx(c, mainFs) : 0;
+    const mainGap = caption ? Math.max(1, Math.round(mainFs * 0.06)) : 0;
+    const betweenTextGap = caption && subcaption ? Math.max(1, Math.round(subFs * 0.08)) : 0;
+    const subGap = !caption && subcaption ? Math.max(1, Math.round(subFs * 0.08)) : 0;
+    const mainLineH = caption ? Math.ceil(mainFs * 1.08) : 0;
+    const subLineH = subcaption ? Math.ceil(subFs * 1.08) : 0;
+    const textBlockH = mainLineH + subLineH + mainGap + betweenTextGap + subGap;
+
+    const maxQr = Math.min(c.width - margin*2, c.height - margin*2 - textBlockH);
+    const quietModules = quietZoneModules();
+    const modulePx = Math.max(1, Math.floor(maxQr / (n + quietModules*2)));
     const qrPx = n * modulePx;
-    const quiet = 4 * modulePx;
+    const quiet = quietModules * modulePx;
     const total = qrPx + quiet*2;
     const x0 = Math.round((c.width-total)/2) + quiet;
-    const contentH = total + (caption ? gap + captionLineH : 0);
+    const contentH = total + textBlockH;
     const top = Math.max(margin, Math.round((c.height-contentH)/2));
     const y0 = top + quiet;
 
@@ -220,30 +268,55 @@
     for (let r=0;r<n;r++) for (let col=0;col<n;col++) {
       if (qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx, y0+r*modulePx, modulePx, modulePx);
     }
+
+    const maxTextWidth = c.width - margin*2;
+    let cursorY = top + total;
+
     if (caption) {
-      ctx.font = `700 ${fs}px Arial, Helvetica, sans-serif`;
-      while (fs > 10 && ctx.measureText(caption).width > c.width-margin*2) {
-        fs--; ctx.font = `700 ${fs}px Arial, Helvetica, sans-serif`;
-      }
-      const qrBottom = top + total;
-      const captionY = Math.min(c.height-margin-Math.ceil(fs*0.5), qrBottom + gap + Math.ceil(fs*0.55));
+      mainFs = fitTextFont(ctx, caption, mainFs, 10, maxTextWidth, 700);
+      cursorY += mainGap;
+      const captionY = Math.min(c.height-margin-Math.ceil(mainFs*0.5), cursorY + Math.ceil(mainFs*0.55));
       ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle="#000";
       ctx.fillText(caption, c.width/2, captionY);
+      cursorY += Math.ceil(mainFs * 1.08);
+    }
+
+    if (subcaption) {
+      subFs = fitTextFont(ctx, subcaption, subFs, 9, maxTextWidth, 600);
+      cursorY += caption ? betweenTextGap : subGap;
+      const subY = Math.min(c.height-margin-Math.ceil(subFs*0.5), cursorY + Math.ceil(subFs*0.55));
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle="#000";
+      ctx.fillText(subcaption, c.width/2, subY);
     }
     return n;
   }
 
-  async function drawQuickChartLabel(ctx, c) {
+  async function drawQuickChartLabel(ctx, c, subcaption="") {
     const {image} = await loadQuickChartBitmap();
     try {
       ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
       ctx.imageSmoothingEnabled=true;
       ctx.imageSmoothingQuality="high";
+
+      const margin = Math.max(6, Math.round(c.width * 0.025));
+      let subFs = subcaption ? subcaptionFontPx(c, captionFontPx(c, els.caption.value.trim())) : 0;
+      const subGap = subcaption ? Math.max(1, Math.round(subFs * 0.08)) : 0;
+      const subLineH = subcaption ? Math.ceil(subFs * 1.12) : 0;
+      const reservedBottom = subcaption ? subGap + subLineH + margin : 0;
+
       const iw=image.width, ih=image.height;
-      const scale=Math.min(c.width/iw,c.height/ih);
+      const availableH = Math.max(1, c.height - reservedBottom);
+      const scale=Math.min(c.width/iw, availableH/ih);
       const dw=Math.round(iw*scale), dh=Math.round(ih*scale);
-      const dx=Math.round((c.width-dw)/2), dy=Math.round((c.height-dh)/2);
+      const dx=Math.round((c.width-dw)/2), dy=Math.max(0, Math.round((availableH-dh)/2));
       ctx.drawImage(image,dx,dy,dw,dh);
+
+      if (subcaption) {
+        subFs = fitTextFont(ctx, subcaption, subFs, 9, c.width-margin*2, 600);
+        ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#000";
+        const y = Math.min(c.height-margin-Math.ceil(subFs*.5), availableH + subGap + Math.ceil(subFs*.55));
+        ctx.fillText(subcaption,c.width/2,y);
+      }
     } finally { if (typeof image.close === "function") image.close(); }
   }
 
@@ -266,20 +339,31 @@
         els.renderModeInfo.innerHTML=`<span>✓</span><span>Offline-Modus aktiv – funktioniert ohne Internet.</span>`;
       }
     }
+    updateQuietZoneUi();
   }
 
   function updateParamPanel(renderLabel) {
     const set=(id,val)=>{ if(els[id]) els[id].textContent=(val===null||val===undefined||val==="")?"–":String(val); };
     set("paramText",els.qrText.value.trim());
     set("paramCaption",els.caption.value.trim());
+    set("paramSubcaption",els.subcaption.value.trim());
     set("paramCaptionSize",quickChartTemplateParams?.get("captionFontSize") || (Number(els.captionScale.value)?`${els.captionScale.value}%`:"Auto"));
     set("paramSize",quickChartTemplateParams?.get("size") || `${printerGeometry().size.w_px}×${printerGeometry().size.h_px} px`);
     set("paramEcc",els.ecc.value);
     set("paramRenderMode",renderLabel || (activeRenderMode()==="quickchart"?"QuickChart API":"Offline lokal"));
+    set("paramQuietZone", activeRenderMode()==="local" ? `${quietZoneModules()} Module` : "nur lokal");
     if (els.captionStatus) {
       const cap=els.caption.value.trim();
+      const sub=els.subcaption.value.trim();
       els.captionStatus.className="inline-status neutral";
-      els.captionStatus.innerHTML=cap?`<span>✓</span><span>Caption „${cap.replace(/[<>]/g,"")}“ wird im aktuellen Renderer mit ausgegeben.</span>`:`<span>✓</span><span>Keine Caption gesetzt.</span>`;
+      if (cap || sub) {
+        const parts=[];
+        if(cap) parts.push(`Caption „${cap.replace(/[<>]/g,"")}“`);
+        if(sub) parts.push(`Subcaption „${sub.replace(/[<>]/g,"")}“`);
+        els.captionStatus.innerHTML=`<span>✓</span><span>${parts.join(" · ")} wird ausgegeben.</span>`;
+      } else {
+        els.captionStatus.innerHTML=`<span>✓</span><span>Keine Caption gesetzt.</span>`;
+      }
     }
   }
 
@@ -310,6 +394,7 @@
       const ctx = c.getContext("2d", {alpha:false});
       const text = els.qrText.value.trim();
       const caption = els.caption.value.trim();
+      const subcaption = els.subcaption.value.trim();
       if (!text) {
         drawPlaceholder(ctx,c.width,c.height);
         els.renderState.textContent = "bereit";
@@ -320,12 +405,12 @@
         const mode=activeRenderMode();
         if (mode === "quickchart") {
           els.renderState.textContent="QuickChart …";
-          await drawQuickChartLabel(ctx,c);
+          await drawQuickChartLabel(ctx,c,subcaption);
           if (generation !== renderGeneration) return;
           els.renderState.textContent=`QuickChart API · ${utf8ByteLength(text)} B`;
           updateParamPanel("QuickChart API");
         } else {
-          const n=drawLocalLabel(ctx,c,text,caption);
+          const n=drawLocalLabel(ctx,c,text,caption,subcaption);
           els.renderState.textContent=`lokal · ${n}×${n} · ${utf8ByteLength(text)} B`;
           updateParamPanel("Offline lokal");
         }
@@ -341,7 +426,7 @@
         if (generation !== renderGeneration) return;
         if (activeRenderMode() === "quickchart") {
           try {
-            const n=drawLocalLabel(ctx,c,text,caption);
+            const n=drawLocalLabel(ctx,c,text,caption,subcaption);
             els.renderState.textContent=`Offline-Fallback · ${n}×${n}`;
             updateParamPanel("Offline-Fallback");
             status("QuickChart nicht erreichbar oder im Browser blockiert. Lokaler Renderer wird als Fallback verwendet: "+e.message,"warn");
@@ -420,6 +505,7 @@
     await LocalStore.setSetting("draftQr", els.qrText.value);
     if (els.sourceInput) await LocalStore.setSetting("draftSource", els.sourceInput.value);
     await LocalStore.setSetting("draftCaption", els.caption.value);
+    await LocalStore.setSetting("draftSubcaption", els.subcaption.value);
     await LocalStore.setSetting("captionScale", Number(els.captionScale.value)||0);
     setImportStatus(true);
     updateCaptionScaleUi();
@@ -697,6 +783,7 @@
   function applyItem(item) {
     els.qrText.value=item.qr_text || "";
     els.caption.value=item.caption || "";
+    els.subcaption.value=item.subcaption || "";
     els.ecc.value=item.ecc || "M";
     els.density.value=item.density || 3; els.densityOut.value=els.density.value;
     els.captionScale.value = Number(item.caption_scale || 0);
@@ -712,7 +799,7 @@
     if(!name) return;
     const t=now();
     const item={
-      id:uuid(), name, qr_text:qr, caption:els.caption.value.trim(), ecc:els.ecc.value,
+      id:uuid(), name, qr_text:qr, caption:els.caption.value.trim(), subcaption:els.subcaption.value.trim(), ecc:els.ecc.value,
       density:Number(els.density.value), offset_y:Number(els.offsetY.value),
       label_size:els.labelSize.value, caption_scale:Number(els.captionScale.value)||0,
       created_at:t, updated_at:t
@@ -1264,6 +1351,11 @@
       if (caption !== null && !isQuickChartQrUrl(qr || "")) { els.caption.value = caption; changed = true; }
     }
 
+    if (params.has("subcaption")) {
+      els.subcaption.value = String(params.get("subcaption") || "").slice(0,160);
+      changed = true;
+    }
+
     if (params.has("copies")) { els.copies.value = String(clampInt(params.get("copies"),1,20,1)); changed = true; }
     if (params.has("density")) { els.density.value = String(clampInt(params.get("density"),1,5,3)); els.densityOut.value = els.density.value; changed = true; }
     if (params.has("offset")) { els.offsetY.value = String(clampInt(params.get("offset"),-60,60,Number(els.offsetY.value)||0)); changed = true; }
@@ -1279,6 +1371,14 @@
     if (params.has("captionpct")) {
       const pct=Math.max(0,Math.min(25,Number(params.get("captionpct"))||0));
       els.captionScale.value=String(pct); changed=true;
+    }
+
+    const quietParam = params.get("quiet") ?? params.get("qrspace") ?? params.get("quietzone");
+    if (quietParam !== null) {
+      const q=Math.max(0,Math.min(8,Math.round(Number(quietParam)||0)));
+      els.quietZone.value=String(q);
+      updateQuietZoneUi();
+      changed=true;
     }
 
     const returnRaw = params.get("return") ?? params.get("returnUrl") ?? "";
@@ -1393,9 +1493,9 @@
   }
 
   async function init() {
-    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
-     "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
-     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","subcaption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+     "density","densityOut","copies","offsetY","captionScale","captionScaleOut","quietZone","quietZoneOut","quietZoneInfo","quietZoneBlock","paramQuietZone","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
+     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     setupHandoffReceiver();
@@ -1406,12 +1506,14 @@
     els.qrText.value=await LocalStore.getSetting("draftQr","");
     els.sourceInput.value=await LocalStore.getSetting("draftSource",els.qrText.value);
     els.caption.value=await LocalStore.getSetting("draftCaption","");
+    els.subcaption.value=await LocalStore.getSetting("draftSubcaption","");
     els.autoAssetCaption.checked=await LocalStore.getSetting("autoAssetCaption",true);
     els.jiraPrefix.value=sanitizePrefix(await LocalStore.getSetting("jiraPrefix","IAM"));
     if(els.autoAssetCaption.checked && new RegExp(`^${els.jiraPrefix.value.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}-\\d+$`,"i").test(els.caption.value.trim())) { autoCaptionValue=els.caption.value.trim(); els.caption.dataset.auto="1"; }
     els.density.value=await LocalStore.getSetting("density",3); els.densityOut.value=els.density.value;
     els.copies.value=await LocalStore.getSetting("copies",1);
     els.captionScale.value=await LocalStore.getSetting("captionScale",0);
+    els.quietZone.value=String(await LocalStore.getSetting("quietZone",4));
     els.renderMode.value=await LocalStore.getSetting("renderMode","local");
     if(els.renderMode.value==="auto"){ els.renderMode.value="local"; await LocalStore.setSetting("renderMode","local"); }
     const defaultSizeRevision=await LocalStore.getSetting("defaultLabelSizeRevision",0);
@@ -1424,7 +1526,7 @@
     }
     setLabelSize(validLabelSizes.has(savedSize)?savedSize:"40x40",{persist:false,resetOffset:false});
     els.offsetY.value=await LocalStore.getSetting("offsetY",printerGeometry().size.offset_y_px ?? 0);
-    updateCaptionScaleUi(); updateModeUi(); updateGeometryUi(); updateParamPanel(); setPreviewZoom(1);
+    updateCaptionScaleUi(); updateModeUi(); updateQuietZoneUi(); updateGeometryUi(); updateParamPanel(); setPreviewZoom(1);
     await loadProvider();
     els.autoReconnectKnown.checked = await LocalStore.getSetting("autoReconnectKnown", true);
     els.autoPrintOnOpen.checked = await LocalStore.getSetting("autoPrintOnOpen", false);
@@ -1434,8 +1536,9 @@
     const pref = B1Printer.preferredDevice?.();
     if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = pref ? `Bekannter Drucker: ${pref.name || "NIIMBOT"}` : "Noch kein bekannter Drucker gespeichert";
 
-    ["qrText","caption","ecc","invert","captionScale"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; updateCaptionScaleUi(); render(); }));
+    ["qrText","caption","subcaption","ecc","invert","captionScale","quietZone"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; updateCaptionScaleUi(); updateQuietZoneUi(); render(); }));
     els.qrText.addEventListener("input",()=>{ LocalStore.setSetting("draftQr",els.qrText.value); setImportStatus(false); });
+    els.subcaption.addEventListener("input",()=>LocalStore.setSetting("draftSubcaption",els.subcaption.value));
     const processSource = () => {
       LocalStore.setSetting("draftSource",els.sourceInput.value);
       clearTimeout(quickChartDetectTimer);
@@ -1481,6 +1584,7 @@
     els.disconnectAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("disconnectAfterPrint",els.disconnectAfterPrint.checked));
     els.returnAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("returnAfterPrint",els.returnAfterPrint.checked));
     els.returnShortcutName?.addEventListener("change",()=>LocalStore.setSetting("returnShortcutName",els.returnShortcutName.value.trim()));
+    els.quietZone?.addEventListener("change",()=>LocalStore.setSetting("quietZone",quietZoneModules()));
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",shareQrTarget);
     els.savePngBtn.addEventListener("click",savePngSmart);

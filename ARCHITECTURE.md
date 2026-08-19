@@ -1,4 +1,4 @@
-# Architektur v31
+# Architektur v33
 
 ```text
 Gemeinsames Frontend
@@ -49,19 +49,29 @@ Android/Desktop: natives Web Bluetooth.
 Es gibt bewusst keinen separaten beacio-Printer-Provider; die App bleibt auf der W3C-Web-Bluetooth-Oberfläche.
 
 
-## v31 Bluetooth-Lifecycle
+## v33 Bluetooth-Lifecycle
 
 Der Drucker bleibt nicht zwingend an einen einzigen Tab gebunden. Nach der erstmaligen Benutzerfreigabe speichert die App nur eine Präferenz (Geräte-ID/Name). Neue Tabs können bei unterstützter Web-Bluetooth-Implementierung über `navigator.bluetooth.getDevices()` das bereits autorisierte Gerät wiederfinden. Die eigentliche GATT-Verbindung wird weiterhin pro Tab aufgebaut. Nach erfolgreichem Druck kann die App die Verbindung automatisch trennen. Es gibt keine parallele Mehrtab-GATT-Nutzung und keine serverseitige Bluetooth-Bridge.
 
 
-## v31 Return Handler
+## v33 Return Handler
 Nach erfolgreichem Druck kann optional ein validiertes `return=`-Ziel als Top-Level-Navigation geöffnet werden. Der Handler ist bewusst getrennt vom BLE-/Druckpfad und wird erst nach Druckbestätigung und optionalem Disconnect ausgeführt.
 
 
-## v31 Return Provider
+## v33 Return Provider
 Direkte Ziele und `return=shortcut` laufen über denselben Return-Handler nach erfolgreichem Druck und optionalem Disconnect.
 
 
-## v31 Printer Model Layer
+## v33 Printer Model Layer
 
 `printer.js` hält modellbezogene Registry-Daten. `Niimbot.identify()` liefert die Modell-ID; danach wird nur Geometrie desselben Modells verwendet. Unterstützt: B1 (4096), B1 Pro (4097), M2-H (4608). Damit wird vermieden, dass nur aufgrund gleicher DPI eine falsche 300-dpi-Geometrie verwendet wird.
+
+
+## v33 Local QR Geometry
+
+Der lokale Renderer trennt nun explizit drei Größen: QR-Matrix `n`, konfigurierbarer Ruheraum `q` in Modulen und physisch verfügbare Fläche `maxQr`. Die Modulgröße wird mit `floor(maxQr / (n + 2q))` bestimmt. Damit ist der bisher fest eingebaute Wert `q=4` nicht mehr versteckt. QuickChart verwendet weiterhin seinen externen Renderer.
+
+
+## v33 Two-Line Caption Layout
+
+Der Render-Layer unterscheidet `caption` und `subcaption`. Im Offline-Renderer werden beide Zeilen bereits bei der verfügbaren QR-Höhe berücksichtigt. Die Subcaption nutzt eine kleinere Schrift. Im QuickChart-Renderer wird für die zweite Zeile unten Platz reserviert und sie nach dem QuickChart-Bitmap lokal gezeichnet. Dadurch bleibt `subcaption` unabhängig von QuickChart-API-Funktionen.
