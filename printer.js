@@ -6,7 +6,8 @@
       key: "50x30", label: "50 × 30 mm", validated: true,
       sizes: {
         4096: { id:"T50x30_b1", w_px:384, h_px:240, offset_y_px:4, w_mm:50, h_mm:30, validated:true },
-        4097: { id:"T50x30", w_px:584, h_px:354, offset_y_px:0, w_mm:50, h_mm:30, validated:true }
+        4097: { id:"T50x30", w_px:584, h_px:354, offset_y_px:0, w_mm:50, h_mm:30, validated:true },
+        4608: { id:"T50x30_m2h", w_px:567, h_px:354, offset_y_px:0, w_mm:50, h_mm:30, validated:true }
       }
     },
     "40x40": {
@@ -14,7 +15,8 @@
       sizes: {
         // Derived from nominal 203 dpi / 300 dpi geometry. Fine-tune offset on real stock.
         4096: { id:"C40x40_b1", w_px:320, h_px:320, offset_y_px:0, w_mm:40, h_mm:40, validated:false },
-        4097: { id:"C40x40_b1pro", w_px:472, h_px:472, offset_y_px:0, w_mm:40, h_mm:40, validated:false }
+        4097: { id:"C40x40_b1pro", w_px:472, h_px:472, offset_y_px:0, w_mm:40, h_mm:40, validated:false },
+        4608: { id:"C40x40_m2h", w_px:472, h_px:472, offset_y_px:0, w_mm:40, h_mm:40, validated:false }
       }
     }
   };
@@ -27,11 +29,15 @@
     4097: {
       name: "NIIMBOT B1 Pro", id:4097, dpi:300,
       model: { id:4097, name_prefixes:["B1"], task:"v4", density:3, label_type:1, speed:1, dpi:300 }
+    },
+    4608: {
+      name: "NIIMBOT M2-H", id:4608, dpi:300,
+      model: { id:4608, name_prefixes:["M2","M2-H"], task:"b1", density:3, label_type:1, speed:1, dpi:300 }
     }
   };
 
   const NIIMBOT_NAME_PREFIXES = ["B1","B2","B21","M2","D11","D110","N1","NIIMBOT"];
-  const chooserModel = { id:4096, name_prefixes:["B1"], task:"b1", density:3, label_type:1, speed:1, dpi:203 };
+  const chooserModel = { id:4096, name_prefixes:["B1","M2","M2-H"], task:"b1", density:3, label_type:1, speed:1, dpi:203 };
   let activeModel = MODELS[4096];
   let activeSizeKey = "40x40";
   let activeDevice = null;
@@ -43,7 +49,8 @@
 
   function geometry(modelId=activeModel.id, key=activeSizeKey) {
     const preset = LABEL_PRESETS[key] || LABEL_PRESETS["40x40"];
-    const size = preset.sizes[modelId] || preset.sizes[4096];
+    const size = preset.sizes[modelId];
+    if (!size) throw new Error(`Für ${MODELS[modelId]?.name || "Modell "+modelId} ist ${key} noch nicht hinterlegt.`);
     return {...size};
   }
 
@@ -171,12 +178,25 @@
       onStage?.({ stage:"identified", detail:"NIIMBOT-Gerät erkannt", info });
       const id = Number((Niimbot.printer && Niimbot.printer.modelId) || (info && info.modelId));
       if (!MODELS[id]) {
-        throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Erwartet: B1 oder B1 Pro.`);
+        throw new Error(`Verbundenes Modell ${id || "unbekannt"} wird von dieser Version nicht unterstützt. Unterstützt: B1, B1 Pro und M2-H.`);
       }
       activeModel = MODELS[id];
+      if (activeDevice) {
+        try {
+          const pref = readPreferredDevice() || {};
+          localStorage.setItem(PREFERRED_DEVICE_KEY, JSON.stringify({
+            id: activeDevice.id || pref.id || "",
+            name: activeDevice.name || pref.name || activeModel.name,
+            modelId: activeModel.id,
+            modelName: activeModel.name,
+            dpi: activeModel.dpi,
+            ts: Date.now()
+          }));
+        } catch (_) {}
+      }
 
       const ios = isIOS();
-      if (activeModel.id === 4096) {
+      if (activeModel.model.task === "b1") {
         if ("PACE_MS" in Niimbot) Niimbot.PACE_MS = Math.max(10, Number(Niimbot.PACE_MS || 10));
         if (ios) {
           if ("WRITE_MODE" in Niimbot) Niimbot.WRITE_MODE = "paced";

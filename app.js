@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "30";
+  const APP_VERSION = "31";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -67,7 +67,7 @@
     connected = on;
     try { window.name = on ? PRINT_WINDOW_NAME : `niimbot-tab-${handoffTabId}`; } catch (_) {}
     els.printerDot.classList.toggle("ok", on);
-    els.connectLabel.textContent = label || (on ? "B1 verbunden" : "B1 verbinden");
+    els.connectLabel.textContent = label || (on ? "NIIMBOT verbunden" : "NIIMBOT verbinden");
     els.printBtn.disabled = !on || !els.qrText.value.trim();
     try {
       if (on) localStorage.setItem(PRIMARY_PRINTER_TAB_KEY, JSON.stringify({tabId:handoffTabId,ts:Date.now(),version:24}));
@@ -676,7 +676,7 @@
       const row=document.createElement("div"); row.className="list-item";
       const text=document.createElement("div");
       const strong=document.createElement("strong");
-      strong.textContent = `${item.printer || "B1"} · ${(item.label_size || "50x30").replace("x","×")} · ${item.copies || 1}×`;
+      strong.textContent = `${item.printer || "NIIMBOT"} · ${(item.label_size || "50x30").replace("x","×")} · ${item.copies || 1}×`;
       const small=document.createElement("small");
       small.textContent = `${new Date(item.created_at).toLocaleString()} · ${item.qr_text || ""}`;
       text.append(strong,small); row.append(text); els.historyList.append(row);

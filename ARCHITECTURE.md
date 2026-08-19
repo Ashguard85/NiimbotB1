@@ -1,4 +1,4 @@
-# Architektur v30
+# Architektur v31
 
 ```text
 Gemeinsames Frontend
@@ -49,14 +49,19 @@ Android/Desktop: natives Web Bluetooth.
 Es gibt bewusst keinen separaten beacio-Printer-Provider; die App bleibt auf der W3C-Web-Bluetooth-Oberfläche.
 
 
-## v30 Bluetooth-Lifecycle
+## v31 Bluetooth-Lifecycle
 
 Der Drucker bleibt nicht zwingend an einen einzigen Tab gebunden. Nach der erstmaligen Benutzerfreigabe speichert die App nur eine Präferenz (Geräte-ID/Name). Neue Tabs können bei unterstützter Web-Bluetooth-Implementierung über `navigator.bluetooth.getDevices()` das bereits autorisierte Gerät wiederfinden. Die eigentliche GATT-Verbindung wird weiterhin pro Tab aufgebaut. Nach erfolgreichem Druck kann die App die Verbindung automatisch trennen. Es gibt keine parallele Mehrtab-GATT-Nutzung und keine serverseitige Bluetooth-Bridge.
 
 
-## v30 Return Handler
+## v31 Return Handler
 Nach erfolgreichem Druck kann optional ein validiertes `return=`-Ziel als Top-Level-Navigation geöffnet werden. Der Handler ist bewusst getrennt vom BLE-/Druckpfad und wird erst nach Druckbestätigung und optionalem Disconnect ausgeführt.
 
 
-## v30 Return Provider
+## v31 Return Provider
 Direkte Ziele und `return=shortcut` laufen über denselben Return-Handler nach erfolgreichem Druck und optionalem Disconnect.
+
+
+## v31 Printer Model Layer
+
+`printer.js` hält modellbezogene Registry-Daten. `Niimbot.identify()` liefert die Modell-ID; danach wird nur Geometrie desselben Modells verwendet. Unterstützt: B1 (4096), B1 Pro (4097), M2-H (4608). Damit wird vermieden, dass nur aufgrund gleicher DPI eine falsche 300-dpi-Geometrie verwendet wird.
