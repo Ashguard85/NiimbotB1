@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "29";
+  const APP_VERSION = "30";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -1283,9 +1283,15 @@
 
     const returnRaw = params.get("return") ?? params.get("returnUrl") ?? "";
     if (returnRaw) {
-      const parsedReturn = parseReturnTarget(returnRaw);
-      if (parsedReturn) returnAfterPrintUrl = parsedReturn;
-      else shortcutNotice = "Return-URL wurde aus Sicherheitsgründen verworfen.";
+      if (String(returnRaw).toLowerCase() === "shortcut") {
+        const shortcutName = (params.get("shortcut") || els.returnShortcutName?.value || "").trim();
+        if (shortcutName) returnAfterPrintUrl = "shortcuts://run-shortcut?name=" + encodeURIComponent(shortcutName);
+        else shortcutNotice = "Return-Kurzbefehl gewählt, aber kein Kurzbefehlsname gesetzt.";
+      } else {
+        const parsedReturn = parseReturnTarget(returnRaw);
+        if (parsedReturn) returnAfterPrintUrl = parsedReturn;
+        else shortcutNotice = "Return-URL wurde aus Sicherheitsgründen verworfen.";
+      }
     }
 
     const ap = String(params.get("autoprint")||"").toLowerCase();
@@ -1387,7 +1393,7 @@
   }
 
   async function init() {
-    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
@@ -1424,6 +1430,7 @@
     els.autoPrintOnOpen.checked = await LocalStore.getSetting("autoPrintOnOpen", false);
     els.disconnectAfterPrint.checked = await LocalStore.getSetting("disconnectAfterPrint", true);
     els.returnAfterPrint.checked = await LocalStore.getSetting("returnAfterPrint", false);
+    els.returnShortcutName.value = await LocalStore.getSetting("returnShortcutName", "Zurück");
     const pref = B1Printer.preferredDevice?.();
     if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = pref ? `Bekannter Drucker: ${pref.name || "NIIMBOT"}` : "Noch kein bekannter Drucker gespeichert";
 
@@ -1473,6 +1480,7 @@
     els.autoPrintOnOpen?.addEventListener("change",()=>LocalStore.setSetting("autoPrintOnOpen",els.autoPrintOnOpen.checked));
     els.disconnectAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("disconnectAfterPrint",els.disconnectAfterPrint.checked));
     els.returnAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("returnAfterPrint",els.returnAfterPrint.checked));
+    els.returnShortcutName?.addEventListener("change",()=>LocalStore.setSetting("returnShortcutName",els.returnShortcutName.value.trim()));
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",shareQrTarget);
     els.savePngBtn.addEventListener("click",savePngSmart);

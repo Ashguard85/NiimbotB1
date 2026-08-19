@@ -1,9 +1,8 @@
-# Release v29
+# Release v30
 
-- Experimentelle Option „Nach dem Druck zur Ursprungs-App zurück“.
-- Neuer URL-Parameter `return=` bzw. `returnUrl=`.
-- Rückkehr wird erst nach erfolgreichem Druck ausgeführt; bei aktivem Disconnect erst nach dem Trennen.
-- Gefährliche Return-Schemes (`javascript:`, `data:`, `file:`, `blob:`) werden verworfen.
-- v28-Auto-Reconnect, Auto-Print und Disconnect bleiben erhalten.
-- App-Version und Service-Worker-Cache: v29.
-- README enthält Branch-Test und Rollback-Anleitung.
+- Direkte `return=`-Ziele bleiben erhalten.
+- Neuer Komfortmodus `return=shortcut&shortcut=<Name>`.
+- Standard-Kurzbefehlsname kann in der App gespeichert werden.
+- Bluefy → Apple Kurzbefehle als getesteter Rückkehrweg dokumentiert.
+- Auto-Reconnect, Auto-Print und Disconnect bleiben erhalten.
+- App-Version und Service-Worker-Cache: v30.
