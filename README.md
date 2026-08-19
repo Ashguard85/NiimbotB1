@@ -1,13 +1,28 @@
-# QR Label v28
+# QR Label v29
 
-## v28 – Optionaler Auto-Druck nach URL-Aufruf
+## v29 – experimentelle Rückkehr zur Ursprungs-App
 
-v28 ergänzt einen optionalen End-to-End-Workflow für neue Tabs: Wird eine URL/QR-/QuickChart-Nutzlast übergeben, kann die App den bereits freigegebenen NIIMBOT über `navigator.bluetooth.getDevices()` automatisch wiederverbinden, nach erfolgreicher Verbindung sofort drucken und anschließend – wenn aktiviert – die BLE-Verbindung wieder trennen. Die Option **„Nach URL-Aufruf automatisch drucken“** ist aus Sicherheitsgründen standardmäßig deaktiviert. Ein explizites `autoprint=1` in der URL erzwingt den Auto-Druck weiterhin für genau diesen Aufruf. Alte lokal gespeicherte Entwürfe lösen keinen Auto-Druck aus.
+v29 baut auf dem stabilen v28-Workflow auf. Optional kann nach einem erfolgreichen Druck (und optionalem BLE-Disconnect) eine mit `return=` übergebene URL geöffnet werden. Auf iOS/iPadOS kann das eine Universal-Link-URL oder ein registriertes App-URL-Scheme sein. Ob iPadOS/Bluefy tatsächlich in die gewünschte App wechselt, hängt von der Ziel-App und deren Deep-Link-Unterstützung ab.
+
+Beispiel unkodiert:
+
+`https://Ashguard85.github.io/NiimbotB1/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345&return=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345&autoprint=1`
+
+In der App muss **„Nach dem Druck zur Ursprungs-App zurück“** aktiviert sein. Ohne `return=` passiert nach dem Druck kein App-Wechsel.
+
+### Sicherer Branch-Test
+
+Für diesen experimentellen Test `main` auf v28 lassen und einen Branch `return-app-test` von `main` erstellen. In GitHub unter **Settings → Pages → Build and deployment** temporär **Deploy from a branch** wählen, Branch `return-app-test`, Ordner `/(root)`. Zum Zurücksetzen dort wieder `main` + `/(root)` auswählen. GitHub Pages verwendet jeweils die gewählte Veröffentlichungsquelle; der Code im anderen Branch bleibt unverändert.
 
 
-## v28 – Bekannten Drucker automatisch wiederverbinden
+## v29 – Optionaler Auto-Druck nach URL-Aufruf
 
-v28 testet einen einfacheren Mehrtab-Workflow ohne zwingenden Handoff: Nach der ersten manuellen Bluetooth-Auswahl merkt sich die App nur ID/Name des freigegebenen NIIMBOT. In einem neuen Tab ruft sie – sofern vom Browser/der BLE-Bridge unterstützt – `navigator.bluetooth.getDevices()` auf, sucht den bereits freigegebenen Drucker und lässt den bestehenden NIIMBOT-Treiber dieses Gerät direkt wiederverwenden. Dadurch soll kein erneuter Geräteauswahldialog nötig sein.
+v29 ergänzt einen optionalen End-to-End-Workflow für neue Tabs: Wird eine URL/QR-/QuickChart-Nutzlast übergeben, kann die App den bereits freigegebenen NIIMBOT über `navigator.bluetooth.getDevices()` automatisch wiederverbinden, nach erfolgreicher Verbindung sofort drucken und anschließend – wenn aktiviert – die BLE-Verbindung wieder trennen. Die Option **„Nach URL-Aufruf automatisch drucken“** ist aus Sicherheitsgründen standardmäßig deaktiviert. Ein explizites `autoprint=1` in der URL erzwingt den Auto-Druck weiterhin für genau diesen Aufruf. Alte lokal gespeicherte Entwürfe lösen keinen Auto-Druck aus.
+
+
+## v29 – Bekannten Drucker automatisch wiederverbinden
+
+v29 testet einen einfacheren Mehrtab-Workflow ohne zwingenden Handoff: Nach der ersten manuellen Bluetooth-Auswahl merkt sich die App nur ID/Name des freigegebenen NIIMBOT. In einem neuen Tab ruft sie – sofern vom Browser/der BLE-Bridge unterstützt – `navigator.bluetooth.getDevices()` auf, sucht den bereits freigegebenen Drucker und lässt den bestehenden NIIMBOT-Treiber dieses Gerät direkt wiederverwenden. Dadurch soll kein erneuter Geräteauswahldialog nötig sein.
 
 Standardmäßig sind **„Bekannten Drucker automatisch verbinden“** und **„Nach erfolgreichem Druck trennen“** aktiviert. Nach einem bestätigten Druck wartet die App 800 ms, trennt dann GATT und gibt den Drucker für den nächsten Tab frei. Falls `getDevices()` in Bluefy/beacio nicht unterstützt wird oder das bekannte Gerät nicht liefert, bleibt die normale NIIMBOT-Geräteauswahl als Fallback erhalten. Der automatische Wiederverbindungsweg wird beim Start nur versucht, wenn bereits QR-Inhalt vorhanden ist (z. B. durch `#url=...`).
 
@@ -22,7 +37,7 @@ Statische GitHub-Pages-Web-App zum Erzeugen und direkten Drucken von QR-Labels a
 - Labelformate `50×30 mm` und `40×40 mm`.
 - B1/B1-Pro-Autoerkennung.
 - Direktdruck über Web Bluetooth, Dichte/Kopien/Offset, PNG/Share-Fallback.
-- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v28-Server-Provider.
+- Vorlagen und Verlauf lokal in IndexedDB oder optional über den Docker-v29-Server-Provider.
 - Offline-App-Shell und kontrollierte Service-Worker-Updates.
 
 ## QuickChart-Beispiel

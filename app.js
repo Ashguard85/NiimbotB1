@@ -1,6 +1,7 @@
 (() => {
   "use strict";
-  const APP_VERSION = "28";
+  const APP_VERSION = "29";
+  let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
   let provider;
@@ -827,6 +828,34 @@
     }
   }
 
+  function parseReturnTarget(raw) {
+    const value = String(raw || "").trim();
+    if (!value) return "";
+    try {
+      const u = new URL(value, location.href);
+      // HTTPS/HTTP Universal Links plus explicit app deep-link schemes are allowed.
+      // Dangerous script/data/file schemes are always rejected.
+      if (["javascript:","data:","file:","blob:"].includes(u.protocol)) return "";
+      return u.href;
+    } catch (_) {
+      return "";
+    }
+  }
+
+  async function returnToOriginAppAfterPrint() {
+    if (!els.returnAfterPrint?.checked || !returnAfterPrintUrl) return false;
+    const target = returnAfterPrintUrl;
+    status("Druck abgeschlossen · Rückkehr zur Ursprungs-App wird versucht …","ok");
+    await new Promise(r=>setTimeout(r,250));
+    try {
+      location.href = target;
+      return true;
+    } catch (_) {
+      status("Druck abgeschlossen. Rückkehr konnte nicht gestartet werden.","warn");
+      return false;
+    }
+  }
+
   async function printLabel() {
     const qr=els.qrText.value.trim();
     if(!qr || !connected) return;
@@ -855,8 +884,10 @@
         setConnected(false, "B1 verbinden");
         status("Druck abgeschlossen · Bluetooth getrennt. Der nächste Tab kann den bekannten Drucker direkt wieder verbinden.","ok");
         toast("Gedruckt · getrennt");
+        await returnToOriginAppAfterPrint();
       } else {
         status("Druckauftrag vom Drucker bestätigt.","ok"); toast("Gedruckt");
+        await returnToOriginAppAfterPrint();
       }
     } catch(e) {
       const msg = String(e && e.message || e || "Unbekannter Fehler");
@@ -1250,6 +1281,13 @@
       els.captionScale.value=String(pct); changed=true;
     }
 
+    const returnRaw = params.get("return") ?? params.get("returnUrl") ?? "";
+    if (returnRaw) {
+      const parsedReturn = parseReturnTarget(returnRaw);
+      if (parsedReturn) returnAfterPrintUrl = parsedReturn;
+      else shortcutNotice = "Return-URL wurde aus Sicherheitsgründen verworfen.";
+    }
+
     const ap = String(params.get("autoprint")||"").toLowerCase();
     shortcutAutoprint = ["1","true","yes","ja"].includes(ap);
     // Explicit autoprint=1 always wins. Otherwise the persistent option only
@@ -1349,7 +1387,7 @@
   }
 
   async function init() {
-    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
+    ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","knownPrinterInfo","sourceInput","qrText","caption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
      "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
@@ -1385,6 +1423,7 @@
     els.autoReconnectKnown.checked = await LocalStore.getSetting("autoReconnectKnown", true);
     els.autoPrintOnOpen.checked = await LocalStore.getSetting("autoPrintOnOpen", false);
     els.disconnectAfterPrint.checked = await LocalStore.getSetting("disconnectAfterPrint", true);
+    els.returnAfterPrint.checked = await LocalStore.getSetting("returnAfterPrint", false);
     const pref = B1Printer.preferredDevice?.();
     if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = pref ? `Bekannter Drucker: ${pref.name || "NIIMBOT"}` : "Noch kein bekannter Drucker gespeichert";
 
@@ -1433,6 +1472,7 @@
     els.autoReconnectKnown?.addEventListener("change",()=>LocalStore.setSetting("autoReconnectKnown",els.autoReconnectKnown.checked));
     els.autoPrintOnOpen?.addEventListener("change",()=>LocalStore.setSetting("autoPrintOnOpen",els.autoPrintOnOpen.checked));
     els.disconnectAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("disconnectAfterPrint",els.disconnectAfterPrint.checked));
+    els.returnAfterPrint?.addEventListener("change",()=>LocalStore.setSetting("returnAfterPrint",els.returnAfterPrint.checked));
     els.printBtn.addEventListener("click",printLabel);
     els.shareBtn.addEventListener("click",shareQrTarget);
     els.savePngBtn.addEventListener("click",savePngSmart);
