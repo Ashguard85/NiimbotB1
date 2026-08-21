@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "40";
+  const APP_VERSION = "41";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -30,12 +30,13 @@
   let designerElement = "qr";
   let designerDrag = null;
   const DESIGN_DEFAULTS = Object.freeze({
-    qr: Object.freeze({x:50,y:42,scale:100}),
-    caption: Object.freeze({x:50,y:82,scale:100}),
-    subcaption: Object.freeze({x:50,y:91,scale:100})
+    qr: Object.freeze({x:50,y:42,scale:100,rotation:0}),
+    caption: Object.freeze({x:50,y:82,scale:100,rotation:0}),
+    subcaption: Object.freeze({x:50,y:91,scale:100,rotation:0})
   });
   let designerState = {
     enabled:false,
+    locked:false,
     qr:{...DESIGN_DEFAULTS.qr},
     caption:{...DESIGN_DEFAULTS.caption},
     subcaption:{...DESIGN_DEFAULTS.subcaption}
@@ -265,7 +266,8 @@
     return {
       x:Math.max(0,Math.min(100,Number(v.x ?? fallback.x))),
       y:Math.max(0,Math.min(100,Number(v.y ?? fallback.y))),
-      scale:Math.max(40,Math.min(160,Number(v.scale ?? fallback.scale)))
+      scale:Math.max(40,Math.min(160,Number(v.scale ?? fallback.scale))),
+      rotation:[0,90,180,270].includes(Number(v.rotation)) ? Number(v.rotation) : (fallback.rotation || 0)
     };
   }
 
@@ -274,6 +276,7 @@
     const base=cloneDesignDefaults();
     if(saved && typeof saved==="object"){
       base.enabled=!!saved.enabled;
+      base.locked=!!saved.locked;
       base.qr=normalizeDesignPart(saved.qr,DESIGN_DEFAULTS.qr);
       base.caption=normalizeDesignPart(saved.caption,DESIGN_DEFAULTS.caption);
       base.subcaption=normalizeDesignPart(saved.subcaption,DESIGN_DEFAULTS.subcaption);
@@ -286,6 +289,7 @@
   async function saveDesignerState() {
     await LocalStore.setSetting(designStorageKey(),{
       enabled:!!designerState.enabled,
+      locked:!!designerState.locked,
       qr:{...designerState.qr},
       caption:{...designerState.caption},
       subcaption:{...designerState.subcaption}
@@ -302,10 +306,13 @@
     els.designerControls.classList.toggle("is-disabled",!enabled);
     document.querySelectorAll("[data-design-element]").forEach(btn=>btn.classList.toggle("active",btn.dataset.designElement===designerElement));
     const part=currentDesignPart();
+    if(els.designerEditBtn) els.designerEditBtn.classList.toggle("active",enabled && !designerState.locked);
+    if(els.designerLockBtn) els.designerLockBtn.classList.toggle("active",enabled && designerState.locked);
+    document.querySelectorAll("[data-design-rotation]").forEach(btn=>btn.classList.toggle("active",Number(btn.dataset.designRotation)===Number(part.rotation||0)));
     if(els.designerX){ els.designerX.value=String(Math.round(part.x)); els.designerXOut.textContent=`${Math.round(part.x)}%`; }
     if(els.designerY){ els.designerY.value=String(Math.round(part.y)); els.designerYOut.textContent=`${Math.round(part.y)}%`; }
     if(els.designerScale){ els.designerScale.value=String(Math.round(part.scale)); els.designerScaleOut.textContent=`${Math.round(part.scale)}%`; }
-    if(els.designerInfo) els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · ${enabled?"direkt in der Vorschau ziehen.":"Designer ist deaktiviert."}</span>`;
+    if(els.designerInfo) els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · ${!enabled?"Designer ist deaktiviert.":designerState.locked?"Positionen gesperrt.":designerElement==="qr"?"QR füllt den Rahmen ohne automatischen Ruheraum.":"Tippen wählt aus, Ziehen verschiebt."}</span>`;
     if(els.designerSelection) els.designerSelection.classList.toggle("hidden",!enabled || activeRenderMode()!=="local");
     updateDesignerSelection();
   }
@@ -332,6 +339,7 @@
     if(next.x!==undefined) part.x=Math.max(0,Math.min(100,Number(next.x)));
     if(next.y!==undefined) part.y=Math.max(0,Math.min(100,Number(next.y)));
     if(next.scale!==undefined) part.scale=Math.max(40,Math.min(160,Number(next.scale)));
+    if(next.rotation!==undefined) part.rotation=[0,90,180,270].includes(Number(next.rotation))?Number(next.rotation):0;
     updateDesignerUi();
     render(true);
     if(persist) void saveDesignerState();
@@ -354,6 +362,19 @@
     const maxQr=Math.max(1,Math.min(c.width-margin*2,c.height-margin*2-textBlockH));
     const q=quietZoneModules();
     return {margin,mainFs,subFs,maxQr,q};
+  }
+
+  function setDesignerHit(el,b,show=true) {
+    if(!el) return;
+    el.classList.toggle("hidden",!show || !designerState.enabled || activeRenderMode()!=="local");
+    if(!show) return;
+    el.style.left=`${b.x}%`; el.style.top=`${b.y}%`; el.style.width=`${b.w}%`; el.style.height=`${b.h}%`;
+  }
+  function updateDesignerHitTargets(c,total,caption,subcaption,m) {
+    const q=designerState.qr, qw=total/c.width*100, qh=total/c.height*100;
+    setDesignerHit(els.designerHitQr,{x:q.x-qw/2,y:q.y-qh/2,w:qw,h:qh});
+    if(caption){ const d=designerState.caption, fs=m.mainFs*d.scale/100, w=Math.min(90,Math.max(18,caption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); setDesignerHit(els.designerHitCaption,{x:d.x-w/2,y:d.y-h/2,w,h}); } else setDesignerHit(els.designerHitCaption,{},false);
+    if(subcaption){ const d=designerState.subcaption, fs=m.subFs*d.scale/100, w=Math.min(90,Math.max(18,subcaption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); setDesignerHit(els.designerHitSubcaption,{x:d.x-w/2,y:d.y-h/2,w,h}); } else setDesignerHit(els.designerHitSubcaption,{},false);
   }
 
   function drawDesignerLocalLabel(ctx,c,text,caption,subcaption) {
@@ -379,23 +400,26 @@
     const left=Math.round(centerX-total/2);
     const top=Math.round(centerY-total/2);
     const x0=left+quiet, y0=top+quiet;
+    ctx.save(); ctx.translate(centerX,centerY); ctx.rotate((qrDesign.rotation||0)*Math.PI/180); ctx.translate(-centerX,-centerY);
     for(let r=0;r<n;r++) for(let col=0;col<n;col++){
       if(qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx,y0+r*modulePx,modulePx,modulePx);
     }
+    ctx.restore();
 
     if(caption){
       const d=designerState.caption;
       let fs=fitTextFont(ctx,caption,m.mainFs*d.scale/100,8,c.width-m.margin*2,700);
       ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#000";
-      ctx.fillText(caption,c.width*d.x/100,c.height*d.y/100);
+      ctx.save(); ctx.translate(c.width*d.x/100,c.height*d.y/100); ctx.rotate((d.rotation||0)*Math.PI/180); ctx.fillText(caption,0,0); ctx.restore();
     }
     if(subcaption){
       const d=designerState.subcaption;
       let fs=fitTextFont(ctx,subcaption,m.subFs*d.scale/100,8,c.width-m.margin*2,600);
       ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#000";
-      ctx.fillText(subcaption,c.width*d.x/100,c.height*d.y/100);
+      ctx.save(); ctx.translate(c.width*d.x/100,c.height*d.y/100); ctx.rotate((d.rotation||0)*Math.PI/180); ctx.fillText(subcaption,0,0); ctx.restore();
     }
 
+    updateDesignerHitTargets(c,total,caption,subcaption,m);
     const qrBounds={x:left/c.width*100,y:top/c.height*100,w:total/c.width*100,h:total/c.height*100};
     if(designerElement==="qr") updateDesignerSelection(qrBounds);
     return n;
@@ -1666,7 +1690,7 @@
   async function init() {
     ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","subcaption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","quietZone","quietZoneOut","quietZoneInfo","quietZoneBlock","paramQuietZone","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
-     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue","designerEnabled","designerControls","designerX","designerXOut","designerY","designerYOut","designerScale","designerScaleOut","designerCenterBtn","designerResetElementBtn","designerResetAllBtn","designerInfo","designerSelection",
+     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue","designerEnabled","designerControls","designerEditBtn","designerLockBtn","designerRotateAllBtn","designerHitQr","designerHitCaption","designerHitSubcaption","designerX","designerXOut","designerY","designerYOut","designerScale","designerScaleOut","designerCenterBtn","designerResetElementBtn","designerResetAllBtn","designerInfo","designerSelection",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     setupHandoffReceiver();
@@ -1743,32 +1767,28 @@
       updateDesignerUi(); render(true); void saveDesignerState();
     });
 
-    const designerPointerPosition=(ev)=>{
-      const rect=els.previewStage.getBoundingClientRect();
-      return {
-        x:Math.max(0,Math.min(100,(ev.clientX-rect.left)/rect.width*100)),
-        y:Math.max(0,Math.min(100,(ev.clientY-rect.top)/rect.height*100))
-      };
-    };
-    els.previewStage?.addEventListener("pointerdown",ev=>{
-      if(!designerState.enabled || activeRenderMode()!=="local") return;
-      designerDrag={pointerId:ev.pointerId};
-      try{ els.previewStage.setPointerCapture(ev.pointerId); }catch(_){}
-      const p=designerPointerPosition(ev); setDesignerPart(p,{persist:false});
-      ev.preventDefault();
+    els.designerEditBtn?.addEventListener("click",()=>{ designerState.locked=false; updateDesignerUi(); void saveDesignerState(); });
+    els.designerLockBtn?.addEventListener("click",()=>{ designerState.locked=true; updateDesignerUi(); void saveDesignerState(); });
+    document.querySelectorAll("[data-design-rotation]").forEach(btn=>btn.addEventListener("click",()=>setDesignerPart({rotation:Number(btn.dataset.designRotation)||0})));
+    els.designerRotateAllBtn?.addEventListener("click",()=>{
+      for(const key of ["qr","caption","subcaption"]){ const d=designerState[key], x=d.x, y=d.y; d.x=100-y; d.y=x; d.rotation=((Number(d.rotation)||0)+90)%360; }
+      updateDesignerUi(); render(true); void saveDesignerState();
     });
-    els.previewStage?.addEventListener("pointermove",ev=>{
-      if(!designerDrag || designerDrag.pointerId!==ev.pointerId) return;
-      const p=designerPointerPosition(ev); setDesignerPart(p,{persist:false});
-      ev.preventDefault();
+    const designerPointerPosition=(ev)=>{ const r=els.previewStage.getBoundingClientRect(); return {x:Math.max(0,Math.min(100,(ev.clientX-r.left)/r.width*100)),y:Math.max(0,Math.min(100,(ev.clientY-r.top)/r.height*100))}; };
+    document.querySelectorAll("[data-hit-element]").forEach(hit=>{
+      hit.addEventListener("pointerdown",ev=>{
+        if(!designerState.enabled || activeRenderMode()!=="local") return;
+        designerElement=hit.dataset.hitElement||"qr"; updateDesignerUi();
+        if(designerState.locked){ ev.preventDefault(); return; }
+        const p=designerPointerPosition(ev), d=currentDesignPart();
+        designerDrag={pointerId:ev.pointerId,offsetX:p.x-d.x,offsetY:p.y-d.y,hit};
+        try{hit.setPointerCapture(ev.pointerId)}catch(_){}
+        ev.preventDefault();
+      });
+      hit.addEventListener("pointermove",ev=>{ if(!designerDrag || designerDrag.pointerId!==ev.pointerId || designerDrag.hit!==hit || designerState.locked) return; const p=designerPointerPosition(ev); setDesignerPart({x:p.x-designerDrag.offsetX,y:p.y-designerDrag.offsetY},{persist:false}); ev.preventDefault(); });
+      const finish=ev=>{ if(!designerDrag || designerDrag.pointerId!==ev.pointerId || designerDrag.hit!==hit) return; designerDrag=null; void saveDesignerState(); try{hit.releasePointerCapture(ev.pointerId)}catch(_){} };
+      hit.addEventListener("pointerup",finish); hit.addEventListener("pointercancel",finish);
     });
-    const finishDesignerDrag=ev=>{
-      if(!designerDrag || designerDrag.pointerId!==ev.pointerId) return;
-      designerDrag=null; void saveDesignerState();
-      try{ els.previewStage.releasePointerCapture(ev.pointerId); }catch(_){}
-    };
-    els.previewStage?.addEventListener("pointerup",finishDesignerDrag);
-    els.previewStage?.addEventListener("pointercancel",finishDesignerDrag);
 
     els.qrText.addEventListener("input",()=>{ LocalStore.setSetting("draftQr",els.qrText.value); setImportStatus(false); });
     els.subcaption.addEventListener("input",()=>LocalStore.setSetting("draftSubcaption",els.subcaption.value));

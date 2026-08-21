@@ -1,4 +1,4 @@
-# Architektur v40
+# Architektur v41
 
 ```text
 Gemeinsames Frontend
@@ -49,38 +49,38 @@ Android/Desktop: natives Web Bluetooth.
 Es gibt bewusst keinen separaten beacio-Printer-Provider; die App bleibt auf der W3C-Web-Bluetooth-Oberfläche.
 
 
-## v40 Bluetooth-Lifecycle
+## v41 Bluetooth-Lifecycle
 
 Der Drucker bleibt nicht zwingend an einen einzigen Tab gebunden. Nach der erstmaligen Benutzerfreigabe speichert die App nur eine Präferenz (Geräte-ID/Name). Neue Tabs können bei unterstützter Web-Bluetooth-Implementierung über `navigator.bluetooth.getDevices()` das bereits autorisierte Gerät wiederfinden. Die eigentliche GATT-Verbindung wird weiterhin pro Tab aufgebaut. Nach erfolgreichem Druck kann die App die Verbindung automatisch trennen. Es gibt keine parallele Mehrtab-GATT-Nutzung und keine serverseitige Bluetooth-Bridge.
 
 
-## v40 Return Handler
+## v41 Return Handler
 Nach erfolgreichem Druck kann optional ein validiertes `return=`-Ziel als Top-Level-Navigation geöffnet werden. Der Handler ist bewusst getrennt vom BLE-/Druckpfad und wird erst nach Druckbestätigung und optionalem Disconnect ausgeführt.
 
 
-## v40 Return Provider
+## v41 Return Provider
 Direkte Ziele und `return=shortcut` laufen über denselben Return-Handler nach erfolgreichem Druck und optionalem Disconnect.
 
 
-## v40 Printer Model Layer
+## v41 Printer Model Layer
 
 `printer.js` hält modellbezogene Registry-Daten. `Niimbot.identify()` liefert die Modell-ID; danach wird nur Geometrie desselben Modells verwendet. Unterstützt: B1 (4096), B1 Pro (4097), M2-H (4608). Damit wird vermieden, dass nur aufgrund gleicher DPI eine falsche 300-dpi-Geometrie verwendet wird.
 
 
-## v40 Local QR Geometry
+## v41 Local QR Geometry
 
 Der lokale Renderer trennt nun explizit drei Größen: QR-Matrix `n`, konfigurierbarer Ruheraum `q` in Modulen und physisch verfügbare Fläche `maxQr`. Die Modulgröße wird mit `floor(maxQr / (n + 2q))` bestimmt. Damit ist der bisher fest eingebaute Wert `q=4` nicht mehr versteckt. QuickChart verwendet weiterhin seinen externen Renderer.
 
 
-## v40 Two-Line Caption Layout
+## v41 Two-Line Caption Layout
 
 Der Render-Layer unterscheidet `caption` und `subcaption`. Im Offline-Renderer werden beide Zeilen bereits bei der verfügbaren QR-Höhe berücksichtigt. Die Subcaption nutzt eine kleinere Schrift. Im QuickChart-Renderer wird für die zweite Zeile unten Platz reserviert und sie nach dem QuickChart-Bitmap lokal gezeichnet. Dadurch bleibt `subcaption` unabhängig von QuickChart-API-Funktionen.
 
 
-## v40 Label Designer
+## v41 Label Designer
 
-Der Designer ist eine clientseitige Schicht auf dem lokalen Renderer. Pro `labelSize` wird ein Objekt `labelDesigner:<size>` in den lokalen Einstellungen gespeichert. Jedes Element besitzt normalisierte X/Y-Koordinaten (0–100) und einen Skalierungsfaktor. Die dynamischen Inhalte (`qrText`, `caption`, `subcaption`) bleiben davon getrennt. Es gibt in v40 bewusst keine benannten Layouts und keine Synchronisation dieser Designerwerte.
+Der Designer ist eine clientseitige Schicht auf dem lokalen Renderer. Pro `labelSize` wird ein Objekt `labelDesigner:<size>` in den lokalen Einstellungen gespeichert. Jedes Element besitzt normalisierte X/Y-Koordinaten (0–100) und einen Skalierungsfaktor. Die dynamischen Inhalte (`qrText`, `caption`, `subcaption`) bleiben davon getrennt. Es gibt in v41 bewusst keine benannten Layouts und keine Synchronisation dieser Designerwerte.
 
 
-## v40 Manual QR Rule
+## v41 Manual QR Rule
 Im manuellen Designer ist `quiet=0` intern erzwungen. Der globale `quiet`-Wert wird nur im automatischen lokalen Renderer verwendet. So bildet die Designer-Auswahl exakt die QR-Matrix ab und der Benutzer kontrolliert den gesamten Außenabstand selbst.
