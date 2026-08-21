@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "34";
+  const APP_VERSION = "40";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -364,9 +364,11 @@
     const m=qrMatrixMetrics(c,n,caption,subcaption);
     const qrDesign=designerState.qr;
     const scale=Math.max(.4,Math.min(1.6,qrDesign.scale/100));
-    const maxTotal=Math.max(1,Math.floor(m.maxQr*scale));
-    const modulePx=Math.max(1,Math.floor(maxTotal/(n+m.q*2)));
-    const qrPx=n*modulePx, quiet=m.q*modulePx, total=qrPx+quiet*2;
+    // Manual designer: deliberately NO automatic quiet zone.
+    // The user owns all whitespace through position and size.
+    const maxMatrix=Math.max(1,Math.floor(Math.min(c.width,c.height)*0.72*scale));
+    const modulePx=Math.max(1,Math.floor(maxMatrix/n));
+    const qrPx=n*modulePx, quiet=0, total=qrPx;
 
     ctx.imageSmoothingEnabled=false;
     ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);

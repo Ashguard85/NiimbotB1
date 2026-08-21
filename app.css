@@ -34,3 +34,36 @@ body.ble-choosing::after{content:"Bluetooth-Gerät auswählen …";display:block
 .designer-selection.hidden{display:none}
 body:has(#designerEnabled:checked) .preview-stage{touch-action:none;cursor:move}
 @media(max-width:700px){.designer-sliders{grid-template-columns:1fr}.designer-actions .btn{flex:1 1 auto}}
+
+/* v40 tablet-first composition */
+.workspace{grid-template-columns:1fr!important;max-width:1180px;margin:0 auto}
+.preview-panel{order:1}
+.printer-panel{order:2}
+.preview-panel{padding:16px}
+.preview-viewport{min-height:360px;background-image:linear-gradient(#eef2f7 1px,transparent 1px),linear-gradient(90deg,#eef2f7 1px,transparent 1px);background-size:20px 20px}
+.designer-details,.compact-details{border:1px solid var(--line);border-radius:12px;background:#fff;margin-top:12px;overflow:hidden}
+.designer-details>summary,.compact-details>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:13px 14px;background:#fff}
+.designer-details>summary::-webkit-details-marker,.compact-details>summary::-webkit-details-marker{display:none}
+.designer-details>summary span,.compact-details>summary span{display:grid;gap:2px}
+.designer-details>summary small,.compact-details>summary small{font-weight:400;color:var(--muted);font-size:11px}
+.designer-details>summary:after,.compact-details>summary:after{content:"⌄";font-size:18px;transition:transform .15s}
+.designer-details[open]>summary:after,.compact-details[open]>summary:after{transform:rotate(180deg)}
+.designer-v40{border-top:1px solid var(--line);padding:14px;margin:0}
+.designer-v40>.designer-title-line{display:none}
+.details-body{padding:14px;border-top:1px solid var(--line)}
+.details-body>.field-block:last-child{margin-bottom:0}
+.printer-panel{padding:0}
+.printer-panel>.compact-details{border:0;margin:0}
+.capture-actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(min-width:760px){
+  .details-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}
+  .details-body>.capture-block,.details-body>.field-block:has(#sourceInput){grid-column:1/-1}
+  .designer-sliders{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .preview-panel{order:1}.printer-panel{order:2}
+  .preview-viewport{min-height:0}
+  .capture-actions{grid-template-columns:1fr}
+}
+
+.workspace>.preview-panel{order:1!important}.workspace>.printer-panel{order:2!important}

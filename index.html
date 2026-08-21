@@ -9,123 +9,41 @@
   <meta name="apple-mobile-web-app-title" content="QR Label">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob: https://quickchart.io; connect-src 'self' https://quickchart.io https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=34">
+  <link rel="manifest" href="./manifest.webmanifest?v=40">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=34">
+  <link rel="stylesheet" href="./app.css?v=40">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><div class="eyebrow">NIIMBOT</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v34</span></div></div>
+  <div class="brand"><div class="eyebrow">NIIMBOT</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v40</span></div></div>
   <div class="top-actions"><span id="onlineBadge" class="top-pill">Online</span><button id="modeBadge" class="top-pill button-pill" type="button">Lokal</button><button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen">⚙︎</button></div>
 </header>
 
 <main class="page-shell">
   <section class="workspace">
-    <article class="panel controls-panel">
-      <div class="field-block capture-block">
-        <span class="label-title">Schnell erfassen</span>
-        <p class="hint">Jira-/Assets-QR direkt scannen, ein Foto mit QR auslesen oder einen kopierten Link übernehmen.</p>
-        <div class="capture-actions">
-          <button id="scanQrBtn" type="button" class="capture-btn"><strong>▣ QR scannen</strong><small>Kamera live</small></button>
-          <button id="scanImageBtn" type="button" class="capture-btn"><strong>▧ Foto / Bild</strong><small>QR aus Bild lesen</small></button>
-          <button id="pasteLinkBtn" type="button" class="capture-btn"><strong>⌘ Link einfügen</strong><small>Zwischenablage</small></button>
-        </div>
-        <input id="scanImageInput" class="sr-only" type="file" accept="image/*">
-        <div id="captureStatus" class="inline-status neutral"><span>i</span><span>Bei Jira Assets wird z. B. <b>id=43322</b> automatisch zu <b>IAM-43322</b>.</span></div>
-      </div>
+    <article class="panel controls-panel printer-panel"><details class="compact-details"><summary><span><strong>Drucker & Ausgabe</strong><small>Bluetooth, Dichte, Kopien und Druckoptionen</small></span></summary><div class="details-body">
+      
 
-      <div class="field-block">
-        <label for="sourceInput" class="label-title">QR-Inhalt oder QuickChart-Link <span class="help-dot" title="Normale Ziel-URL oder kompletter QuickChart-Link">?</span></label>
-        <p class="hint">Füge eine URL oder einen QuickChart-QR-Link ein. Ein Feld genügt.</p>
-        <textarea id="sourceInput" rows="4" spellcheck="false" placeholder="https://quickchart.io/qr?text=...&caption=..."></textarea>
-        <div id="importStatus" class="inline-status hidden"><span>✓</span><span>QuickChart-Link erkannt und alle Parameter übernommen.</span><button id="showParamsBtn" type="button" class="tiny-btn">Parameter anzeigen</button></div>
-      </div>
+      
 
-      <div class="field-block">
-        <label for="qrText" class="label-title">QR-Text (Ziel) <span class="help-dot" title="Dieser Inhalt wird im QR-Code codiert">?</span></label>
-        <p class="hint">Der Inhalt, der im QR-Code codiert wird.</p>
-        <input id="qrText" type="text" spellcheck="false" autocomplete="off" placeholder="https://support.example.com/object?id=123">
-      </div>
+      
 
-      <div class="field-block">
-        <label for="caption" class="label-title">Text unter QR (Caption) <span class="help-dot" title="Wird direkt unter dem QR-Code gedruckt">?</span></label>
-        <p class="hint">Wird unter dem QR-Code angezeigt.</p>
-        <input id="caption" type="text" maxlength="120" placeholder="IAM-43322">
-        <div class="asset-caption-row">
-          <label class="check-line"><input id="autoAssetCaption" type="checkbox" checked> Jira-/Assets-ID automatisch übernehmen</label>
-          <label class="prefix-field"><span>Prefix</span><input id="jiraPrefix" type="text" value="IAM" maxlength="20" autocomplete="off" spellcheck="false"></label>
-        </div>
-      </div>
+      
 
-      <div class="field-block">
-        <label for="subcaption" class="label-title">Subcaption</label>
-        <p class="hint">Zweite, kleinere Textzeile unter der Caption, z. B. eine Raumbezeichnung. URL-Parameter: <code>subcaption=</code>.</p>
-        <input id="subcaption" type="text" maxlength="160" placeholder="z. B. Raum 2.14">
-      </div>
+      
 
-      <div class="field-block">
-        <div class="label-line"><label for="captionScale" class="label-title">Caption-Größe</label><output id="captionScaleOut" class="value-chip">Auto</output></div>
-        <p class="hint">Bei QuickChart wird <code>captionFontSize / size</code> übernommen.</p>
-        <input id="captionScale" class="range" type="range" min="0" max="25" step="0.5" value="0">
-      </div>
+      
 
-      <div class="field-block" id="quietZoneBlock">
-        <div class="label-line"><label for="quietZone" class="label-title">QR-Ruheraum</label><output id="quietZoneOut" class="value-chip">4 Module</output></div>
-        <p class="hint">Weißraum direkt um die QR-Matrix. <strong>4 Module</strong> entsprechen dem QR-Standard. Kleinere Werte vergrößern den QR, können aber die Scan-Zuverlässigkeit reduzieren. Nur im Offline-Renderer.</p>
-        <input id="quietZone" class="range" type="range" min="0" max="8" step="1" value="4">
-        <div id="quietZoneInfo" class="inline-status neutral"><span>✓</span><span>Standard-Ruheraum · 4 Module</span></div>
-      </div>
+      
 
-      <div class="field-block">
-        <span class="label-title">Label-Format</span><p class="hint">Standard ist 40 × 40 mm.</p>
-        <select id="labelSize" class="sr-only" aria-label="Labelformat"><option value="40x40" selected>40 × 40 mm</option><option value="50x30">50 × 30 mm</option></select>
-        <div class="segmented-cards" id="labelSizeCards">
-          <button type="button" class="choice-card active" data-label-size="40x40"><strong>40 × 40 mm</strong><small>quadratisch · Standard</small></button>
-          <button type="button" class="choice-card" data-label-size="50x30"><strong>50 × 30 mm</strong><small>rechteckig · kalibriert</small></button>
-        </div>
-      </div>
+      
 
-      <div class="field-block">
-        <label for="ecc" class="label-title">QR-Fehlerkorrektur</label><p class="hint">Höhere Stufe = robuster, aber mehr Module.</p>
-        <select id="ecc"><option value="L">L – klein</option><option value="M" selected>M – normal (Standard)</option><option value="Q">Q – hoch</option><option value="H">H – sehr hoch</option></select>
-      </div>
+      
 
-      <div class="field-block">
-        <span class="label-title">Render-Modus</span><p class="hint">Erzeuge das Bild offline im Browser oder über die QuickChart API.</p>
-        <select id="renderMode" class="sr-only" aria-label="Render-Modus"><option value="auto">Auto</option><option value="local">Offline lokal</option><option value="quickchart">QuickChart API</option></select>
-        <div class="segmented-cards" id="renderModeCards">
-          <button type="button" class="choice-card active" data-render-mode="local"><strong>Offline (lokal)</strong><small>Im Browser generieren</small></button>
-          <button type="button" class="choice-card" data-render-mode="quickchart"><strong>QuickChart API</strong><small>Original über quickchart.io</small></button>
-        </div>
-        <div id="renderModeInfo" class="inline-status neutral"><span>✓</span><span>Offline-Modus aktiv – funktioniert ohne Internet.</span></div>
-      </div>
+      
 
-      <div class="field-block designer-block">
-        <div class="label-line">
-          <span class="label-title">Label-Designer</span>
-          <label class="switch-line"><input id="designerEnabled" type="checkbox"> <span>aktiv</span></label>
-        </div>
-        <p class="hint">Offline-Renderer: QR, Caption und Subcaption direkt in der Vorschau verschieben und skalieren. Die Positionen werden lokal pro Labelgröße gespeichert.</p>
-        <div id="designerControls" class="designer-controls is-disabled">
-          <div class="designer-elements" role="group" aria-label="Element auswählen">
-            <button type="button" class="btn ghost compact active" data-design-element="qr">QR</button>
-            <button type="button" class="btn ghost compact" data-design-element="caption">Caption</button>
-            <button type="button" class="btn ghost compact" data-design-element="subcaption">Subcaption</button>
-          </div>
-          <div class="designer-sliders">
-            <label class="compact-field"><span>X</span><input id="designerX" type="range" min="0" max="100" step="1" value="50"><output id="designerXOut">50%</output></label>
-            <label class="compact-field"><span>Y</span><input id="designerY" type="range" min="0" max="100" step="1" value="42"><output id="designerYOut">42%</output></label>
-            <label class="compact-field"><span>Größe</span><input id="designerScale" type="range" min="40" max="160" step="1" value="100"><output id="designerScaleOut">100%</output></label>
-          </div>
-          <div class="designer-actions">
-            <button id="designerCenterBtn" class="btn ghost compact" type="button">Zentrieren</button>
-            <button id="designerResetElementBtn" class="btn ghost compact" type="button">Element zurücksetzen</button>
-            <button id="designerResetAllBtn" class="btn ghost compact" type="button">Designer zurücksetzen</button>
-          </div>
-          <div id="designerInfo" class="inline-status neutral"><span>i</span><span>QR ausgewählt · direkt in der Vorschau ziehen.</span></div>
-        </div>
-      </div>
+      
 
       <div class="advanced-row">
         <label class="compact-field"><span>Dichte</span><input id="density" type="range" min="1" max="5" step="1" value="3"><output id="densityOut">3</output></label>
@@ -149,7 +67,7 @@
       <div class="export-actions"><button id="savePngBtn" class="btn ghost" type="button">PNG teilen / sichern</button><button id="savePdfBtn" class="btn ghost" type="button">PDF teilen / sichern</button><button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button><button id="shareBtn" class="btn ghost" type="button">QR-Ziel teilen</button></div>
       <div id="statusBox" class="status info" role="status" aria-live="polite">Bluetooth-Unterstützung wird geprüft …</div>
       <div id="bleBridgeStatus" class="inline-status neutral"><span>i</span><span>Bluetooth-Umgebung wird erkannt …</span></div>
-    </article>
+    </div></details></article>
 
     <article class="panel preview-panel">
       <div class="preview-heading"><h2>Vorschau (<span id="previewMm">40 × 40 mm</span>)</h2><span id="pixelBadge" class="pixel-badge">320 × 320 px</span></div>
@@ -166,12 +84,106 @@
 
       <details id="paramsDetails" class="info-details" open><summary>Parameter (aus deinem Link übernommen)</summary><div class="param-table" id="paramTable"><div><span>QR-Text (text)</span><strong id="paramText">–</strong></div><div><span>Caption (caption)</span><strong id="paramCaption">–</strong></div><div><span>Subcaption</span><strong id="paramSubcaption">–</strong></div><div><span>Caption Font Size</span><strong id="paramCaptionSize">–</strong></div><div><span>QR Size (size)</span><strong id="paramSize">–</strong></div><div><span>Fehlerkorrektur</span><strong id="paramEcc">M</strong></div><div><span>Render-Modus</span><strong id="paramRenderMode">Offline lokal</strong></div><div><span>QR-Ruheraum</span><strong id="paramQuietZone">4 Module</strong></div></div></details>
       <details class="info-details"><summary>So funktioniert es</summary><div class="help-copy"><p><strong>Offline:</strong> schnell, privat und ohne Internet. QR und Caption werden lokal gerendert.</p><p><strong>QuickChart API:</strong> verwendet QuickCharts eigenes Bild und damit dessen Caption-Layout. Benötigt Internet.</p><p>Drucken, PNG und PDF verwenden immer genau die aktuell gerenderte Vorschau.</p></div></details>
-    </article>
+    <details id="designerDetails" class="designer-details" open>
+<summary><span><strong>Label-Designer · manuelle Platzierung</strong><small>QR, Caption und Subcaption direkt in der Vorschau platzieren</small></span></summary>
+<div class="designer-block designer-v40">
+        <div class="label-line designer-title-line">
+          <span class="label-title">Label-Designer · manuelle Platzierung</span>
+          <label class="switch-line"><input id="designerEnabled" type="checkbox"> <span>aktiv</span></label>
+        </div>
+        <p class="hint">Offline-Renderer: QR, Caption und Subcaption direkt in der Vorschau verschieben und skalieren. Die Positionen werden lokal pro Labelgröße gespeichert.</p>
+        <div id="designerControls" class="designer-controls is-disabled">
+          <div class="designer-elements" role="group" aria-label="Element auswählen">
+            <button type="button" class="btn ghost compact active" data-design-element="qr">QR</button>
+            <button type="button" class="btn ghost compact" data-design-element="caption">Caption</button>
+            <button type="button" class="btn ghost compact" data-design-element="subcaption">Subcaption</button>
+          </div>
+          <div class="designer-sliders">
+            <label class="compact-field"><span>X</span><input id="designerX" type="range" min="0" max="100" step="1" value="50"><output id="designerXOut">50%</output></label>
+            <label class="compact-field"><span>Y</span><input id="designerY" type="range" min="0" max="100" step="1" value="42"><output id="designerYOut">42%</output></label>
+            <label class="compact-field"><span>Größe</span><input id="designerScale" type="range" min="40" max="160" step="1" value="100"><output id="designerScaleOut">100%</output></label>
+          </div>
+          <div class="designer-actions">
+            <button id="designerCenterBtn" class="btn ghost compact" type="button">Zentrieren</button>
+            <button id="designerResetElementBtn" class="btn ghost compact" type="button">Element zurücksetzen</button>
+            <button id="designerResetAllBtn" class="btn ghost compact" type="button">Designer zurücksetzen</button>
+          </div>
+          <div id="designerInfo" class="inline-status neutral"><span>i</span><span>QR ausgewählt · direkt in der Vorschau ziehen.</span></div>
+        </div>
+      </div>
+</details>
+<details class="compact-details" open>
+  <summary><span><strong>Inhalt & Beschriftung</strong><small>QR-Ziel, Caption, Subcaption und Schnell-Erfassung</small></span></summary>
+  <div class="details-body"><div class="field-block capture-block">
+        <span class="label-title">Schnell erfassen</span>
+        <p class="hint">Jira-/Assets-QR direkt scannen, ein Foto mit QR auslesen oder einen kopierten Link übernehmen.</p>
+        <div class="capture-actions">
+          <button id="scanQrBtn" type="button" class="capture-btn"><strong>▣ QR scannen</strong><small>Kamera live</small></button>
+          <button id="scanImageBtn" type="button" class="capture-btn"><strong>▧ Foto / Bild</strong><small>QR aus Bild lesen</small></button>
+          <button id="pasteLinkBtn" type="button" class="capture-btn"><strong>⌘ Link einfügen</strong><small>Zwischenablage</small></button>
+        </div>
+        <input id="scanImageInput" class="sr-only" type="file" accept="image/*">
+        <div id="captureStatus" class="inline-status neutral"><span>i</span><span>Bei Jira Assets wird z. B. <b>id=43322</b> automatisch zu <b>IAM-43322</b>.</span></div>
+      </div><div class="field-block">
+        <label for="sourceInput" class="label-title">QR-Inhalt oder QuickChart-Link <span class="help-dot" title="Normale Ziel-URL oder kompletter QuickChart-Link">?</span></label>
+        <p class="hint">Füge eine URL oder einen QuickChart-QR-Link ein. Ein Feld genügt.</p>
+        <textarea id="sourceInput" rows="4" spellcheck="false" placeholder="https://quickchart.io/qr?text=...&caption=..."></textarea>
+        <div id="importStatus" class="inline-status hidden"><span>✓</span><span>QuickChart-Link erkannt und alle Parameter übernommen.</span><button id="showParamsBtn" type="button" class="tiny-btn">Parameter anzeigen</button></div>
+      </div><div class="field-block">
+        <label for="qrText" class="label-title">QR-Text (Ziel) <span class="help-dot" title="Dieser Inhalt wird im QR-Code codiert">?</span></label>
+        <p class="hint">Der Inhalt, der im QR-Code codiert wird.</p>
+        <input id="qrText" type="text" spellcheck="false" autocomplete="off" placeholder="https://support.example.com/object?id=123">
+      </div><div class="field-block">
+        <label for="caption" class="label-title">Text unter QR (Caption) <span class="help-dot" title="Wird direkt unter dem QR-Code gedruckt">?</span></label>
+        <p class="hint">Wird unter dem QR-Code angezeigt.</p>
+        <input id="caption" type="text" maxlength="120" placeholder="IAM-43322">
+        <div class="asset-caption-row">
+          <label class="check-line"><input id="autoAssetCaption" type="checkbox" checked> Jira-/Assets-ID automatisch übernehmen</label>
+          <label class="prefix-field"><span>Prefix</span><input id="jiraPrefix" type="text" value="IAM" maxlength="20" autocomplete="off" spellcheck="false"></label>
+        </div>
+      </div><div class="field-block">
+        <label for="subcaption" class="label-title">Subcaption</label>
+        <p class="hint">Zweite, kleinere Textzeile unter der Caption, z. B. eine Raumbezeichnung. URL-Parameter: <code>subcaption=</code>.</p>
+        <input id="subcaption" type="text" maxlength="160" placeholder="z. B. Raum 2.14">
+      </div><div class="field-block">
+        <div class="label-line"><label for="captionScale" class="label-title">Caption-Größe</label><output id="captionScaleOut" class="value-chip">Auto</output></div>
+        <p class="hint">Bei QuickChart wird <code>captionFontSize / size</code> übernommen.</p>
+        <input id="captionScale" class="range" type="range" min="0" max="25" step="0.5" value="0">
+      </div></div>
+</details>
+<details class="compact-details">
+  <summary><span><strong>Etikett & Renderer</strong><small>Format, Fehlerkorrektur, Offline/QuickChart und QR-Ruheraum</small></span></summary>
+  <div class="details-body"><div class="field-block">
+        <span class="label-title">Label-Format</span><p class="hint">Standard ist 40 × 40 mm.</p>
+        <select id="labelSize" class="sr-only" aria-label="Labelformat"><option value="40x40" selected>40 × 40 mm</option><option value="50x30">50 × 30 mm</option></select>
+        <div class="segmented-cards" id="labelSizeCards">
+          <button type="button" class="choice-card active" data-label-size="40x40"><strong>40 × 40 mm</strong><small>quadratisch · Standard</small></button>
+          <button type="button" class="choice-card" data-label-size="50x30"><strong>50 × 30 mm</strong><small>rechteckig · kalibriert</small></button>
+        </div>
+      </div><div class="field-block">
+        <label for="ecc" class="label-title">QR-Fehlerkorrektur</label><p class="hint">Höhere Stufe = robuster, aber mehr Module.</p>
+        <select id="ecc"><option value="L">L – klein</option><option value="M" selected>M – normal (Standard)</option><option value="Q">Q – hoch</option><option value="H">H – sehr hoch</option></select>
+      </div><div class="field-block">
+        <span class="label-title">Render-Modus</span><p class="hint">Erzeuge das Bild offline im Browser oder über die QuickChart API.</p>
+        <select id="renderMode" class="sr-only" aria-label="Render-Modus"><option value="auto">Auto</option><option value="local">Offline lokal</option><option value="quickchart">QuickChart API</option></select>
+        <div class="segmented-cards" id="renderModeCards">
+          <button type="button" class="choice-card active" data-render-mode="local"><strong>Offline (lokal)</strong><small>Im Browser generieren</small></button>
+          <button type="button" class="choice-card" data-render-mode="quickchart"><strong>QuickChart API</strong><small>Original über quickchart.io</small></button>
+        </div>
+        <div id="renderModeInfo" class="inline-status neutral"><span>✓</span><span>Offline-Modus aktiv – funktioniert ohne Internet.</span></div>
+      </div><div class="field-block" id="quietZoneBlock">
+        <div class="label-line"><label for="quietZone" class="label-title">QR-Ruheraum</label><output id="quietZoneOut" class="value-chip">4 Module</output></div>
+        <p class="hint">Weißraum direkt um die QR-Matrix. <strong>4 Module</strong> entsprechen dem QR-Standard. Kleinere Werte vergrößern den QR, können aber die Scan-Zuverlässigkeit reduzieren. Nur im Offline-Renderer.</p>
+        <input id="quietZone" class="range" type="range" min="0" max="8" step="1" value="4">
+        <div id="quietZoneInfo" class="inline-status neutral"><span>✓</span><span>Standard-Ruheraum · 4 Module</span></div>
+      </div></div>
+</details>
+</article>
   </section>
 
   <section id="settingsSection" class="below-grid">
     <article class="panel"><details><summary>Vorlagen & Verlauf</summary><div class="stack"><div class="subhead"><strong>Vorlagen</strong><button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button></div><div id="presetList" class="list empty">Noch keine Vorlagen.</div><div class="subhead history-head"><strong>Letzte Drucke</strong></div><div id="historyList" class="list empty">Noch keine Drucke.</div></div></details></article>
-    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v34 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
+    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v40 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
   </section>
 </main>
 <div id="scanModal" class="scanner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
@@ -184,6 +196,6 @@
   </div>
 </div>
 
-<footer><span>QR Label v34</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=34" defer></script><script src="./providers.js?v=34" defer></script><script src="./printer.js?v=34" defer></script><script src="./app.js?v=34" defer></script>
+<footer><span>QR Label v40</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=40" defer></script><script src="./providers.js?v=40" defer></script><script src="./printer.js?v=40" defer></script><script src="./app.js?v=40" defer></script>
 </body></html>

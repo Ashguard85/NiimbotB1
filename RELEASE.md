@@ -1,12 +1,12 @@
-# Release v34
+# Release v40
 
-- Neuer visueller Label-Designer.
-- QR, Caption und Subcaption per Touch/Maus direkt verschiebbar.
-- X/Y/Größe zusätzlich über Slider steuerbar.
-- Designerzustand lokal pro Labelgröße gespeichert.
-- Reset pro Element und für den gesamten Designer.
-- Kein Layout-Preset-System und kein `layout=`-URL-Parameter.
-- Designer arbeitet nur mit Offline-Rendering; QuickChart bleibt separat erhalten.
-- Druck, PNG und PDF verwenden das Designer-Canvas.
-- v33 Subcaption, v32 QR-Ruheraum und B1/B1 Pro/M2-H bleiben erhalten.
-- App-Version und Service-Worker-Cache: v34.
+- Tablet-first UI-Neuordnung.
+- Vorschau ist der zentrale obere Arbeitsbereich.
+- Label-Designer liegt zwingend direkt unter der Vorschau.
+- Designer, Inhalt/Beschriftung, Etikett/Renderer und Drucker/Ausgabe sind einklappbar.
+- Alle bisherigen Eingabefunktionen bleiben erhalten.
+- Manuelle QR-Platzierung hat immer 0 automatische Quiet-Zone-Module.
+- Außerhalb des Designers bleibt der konfigurierbare QR-Ruheraum erhalten.
+- Designerzustand bleibt lokal pro Labelgröße gespeichert.
+- B1/B1 Pro/M2-H, Auto-Reconnect, Auto-Print, Disconnect und Return-Shortcut bleiben erhalten.
+- App-Version und Service-Worker-Cache: v40.
