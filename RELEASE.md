@@ -1,12 +1,7 @@
-# Release v42
+# Release v43
 
-- Canvas-Auswahl und Elementbuttons synchron.
-- Auswahlrahmen mit Elementname.
-- 44px Resize-Handle direkt am Element.
-- X/Y/Größe bleiben als präzise Alternative.
-- Hauptrotation als ↻ 90°; exakte Winkel unter Erweitert.
-- Gesamtdrehung begrenzt Elemente auf die Label-Fläche.
-- Quiet-Zone-Steuerung bei aktivem Designer deaktiviert/erklärt.
-- Accordion-Zustände lokal gespeichert.
-- Größere Touch-Ziele.
-- Version/Cache v42.
+- Rotationskorrekte Auswahl-/Hitboxen.
+- 2,5-%-Innenrand für Elemente.
+- Auswahl aufheben per Button, erneutem Elementklick oder freier Vorschaufläche.
+- Rahmen/Resize-Handle verschwinden ohne Auswahl.
+- Version/Cache v43.

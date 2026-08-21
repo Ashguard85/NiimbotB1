@@ -88,3 +88,8 @@ body:has(#designerEnabled:checked) .preview-stage{touch-action:none;cursor:move}
 [data-accordion-key]>summary{min-height:44px}
 #quietZoneBlock.is-disabled{opacity:.58}
 @media(pointer:coarse){.designer-hit{min-width:44px;min-height:44px}.designer-elements .btn,.designer-modebar .btn,.designer-actions .btn,.designer-rotation>.btn{min-height:44px}}
+
+/* v43 */
+.designer-selection,.designer-hit{box-sizing:border-box}
+.designer-selection-label{pointer-events:none}
+.designer-modebar .btn:disabled,.designer-controls input:disabled,.designer-actions .btn:disabled,.designer-rotation .btn:disabled{opacity:.45;cursor:default}

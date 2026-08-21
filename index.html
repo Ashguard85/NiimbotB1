@@ -9,14 +9,14 @@
   <meta name="apple-mobile-web-app-title" content="QR Label">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob: https://quickchart.io; connect-src 'self' https://quickchart.io https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
   <title>QR Label – NIIMBOT</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=42">
+  <link rel="manifest" href="./manifest.webmanifest?v=43">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=42">
+  <link rel="stylesheet" href="./app.css?v=43">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><div class="eyebrow">NIIMBOT</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v42</span></div></div>
+  <div class="brand"><div class="eyebrow">NIIMBOT</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v43</span></div></div>
   <div class="top-actions"><span id="onlineBadge" class="top-pill">Online</span><button id="modeBadge" class="top-pill button-pill" type="button">Lokal</button><button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen">⚙︎</button></div>
 </header>
 
@@ -132,7 +132,7 @@
       <details class="info-details"><summary>So funktioniert es</summary><div class="help-copy"><p><strong>Offline:</strong> schnell, privat und ohne Internet. QR und Caption werden lokal gerendert.</p><p><strong>QuickChart API:</strong> verwendet QuickCharts eigenes Bild und damit dessen Caption-Layout. Benötigt Internet.</p><p>Drucken, PNG und PDF verwenden immer genau die aktuell gerenderte Vorschau.</p></div></details>
     <details id="designerDetails" class="designer-details" data-accordion-key="designer" open>
 <summary><span><strong>Label-Designer · manuelle Platzierung</strong><small>QR, Caption und Subcaption direkt in der Vorschau platzieren</small></span></summary>
-<div class="designer-block designer-v42">
+<div class="designer-block designer-v43">
         <div class="label-line designer-title-line">
           <span class="label-title">Label-Designer · manuelle Platzierung</span>
           <label class="switch-line"><input id="designerEnabled" type="checkbox"> <span>aktiv</span></label>
@@ -141,8 +141,8 @@
         <div id="designerControls" class="designer-controls is-disabled">
           <div class="designer-modebar">
             <button id="designerEditBtn" class="btn ghost compact active touch-control" type="button">✥ Bearbeiten</button>
-            <button id="designerLockBtn" class="btn ghost compact touch-control" type="button">🔒 Sperren</button>
-            <span class="designer-modehint">Tippen = auswählen · Ziehen = verschieben</span>
+            <button id="designerLockBtn" class="btn ghost compact touch-control" type="button">🔒 Sperren</button><button id="designerDeselectBtn" class="btn ghost compact touch-control" type="button">Auswahl aufheben</button>
+            <span class="designer-modehint">Tippen = auswählen · Ziehen = verschieben · freie Fläche = Auswahl aufheben</span>
           </div>
           <div class="designer-elements" role="group" aria-label="Element auswählen">
             <button type="button" class="btn ghost compact active touch-control" data-design-element="qr">QR</button>
@@ -211,7 +211,7 @@
 
   <section id="settingsSection" class="below-grid">
     <article class="panel"><details><summary>Vorlagen & Verlauf</summary><div class="stack"><div class="subhead"><strong>Vorlagen</strong><button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button></div><div id="presetList" class="list empty">Noch keine Vorlagen.</div><div class="subhead history-head"><strong>Letzte Drucke</strong></div><div id="historyList" class="list empty">Noch keine Drucke.</div></div></details></article>
-    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v42 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
+    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v43 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
   </section>
 </main>
 <div id="scanModal" class="scanner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
@@ -224,6 +224,6 @@
   </div>
 </div>
 
-<footer><span>QR Label v42</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=42" defer></script><script src="./providers.js?v=42" defer></script><script src="./printer.js?v=42" defer></script><script src="./app.js?v=42" defer></script>
+<footer><span>QR Label v43</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=43" defer></script><script src="./providers.js?v=43" defer></script><script src="./printer.js?v=43" defer></script><script src="./app.js?v=43" defer></script>
 </body></html>

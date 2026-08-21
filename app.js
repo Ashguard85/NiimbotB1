@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "42";
+  const APP_VERSION = "43";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -28,6 +28,7 @@
   let nativeQrDetector = undefined;
   let bleChooserUiActive = false;
   let designerElement = "qr";
+  const DESIGN_EDGE_MARGIN = 2.5;
   let designerDrag = null;
   let designerResize = null;
   let designerBounds = {qr:null,caption:null,subcaption:null};
@@ -304,56 +305,58 @@
   }
 
   function currentDesignPart() {
-    return designerState[designerElement] || designerState.qr;
+    return designerElement ? (designerState[designerElement] || null) : null;
   }
 
   function updateDesignerUi() {
     if(!els.designerControls) return;
     const enabled=!!designerState.enabled;
     els.designerControls.classList.toggle("is-disabled",!enabled);
-    document.querySelectorAll("[data-design-element]").forEach(btn=>btn.classList.toggle("active",btn.dataset.designElement===designerElement));
-    const part=currentDesignPart();
+    document.querySelectorAll("[data-design-element]").forEach(btn=>btn.classList.toggle("active",!!designerElement && btn.dataset.designElement===designerElement));
+    const part=currentDesignPart(), hasSelection=!!part;
     if(els.designerEditBtn) els.designerEditBtn.classList.toggle("active",enabled && !designerState.locked);
     if(els.designerLockBtn) els.designerLockBtn.classList.toggle("active",enabled && designerState.locked);
-    document.querySelectorAll("[data-design-rotation]").forEach(btn=>btn.classList.toggle("active",Number(btn.dataset.designRotation)===Number(part.rotation||0)));
-    if(els.designerAngleOut) els.designerAngleOut.textContent=`${Number(part.rotation||0)}°`;
-    if(els.designerX){ els.designerX.value=String(Math.round(part.x)); els.designerXOut.textContent=`${Math.round(part.x)}%`; }
-    if(els.designerY){ els.designerY.value=String(Math.round(part.y)); els.designerYOut.textContent=`${Math.round(part.y)}%`; }
-    if(els.designerScale){ els.designerScale.value=String(Math.round(part.scale)); els.designerScaleOut.textContent=`${Math.round(part.scale)}%`; }
-    if(els.designerInfo) els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · ${!enabled?"Designer ist deaktiviert.":designerState.locked?"Positionen gesperrt.":designerElement==="qr"?"QR füllt den Rahmen ohne automatischen Ruheraum.":"Tippen wählt aus, Ziehen verschiebt."}</span>`;
-    if(els.designerSelection) els.designerSelection.classList.toggle("hidden",!enabled || activeRenderMode()!=="local");
+    if(els.designerDeselectBtn) els.designerDeselectBtn.disabled=!hasSelection;
+    document.querySelectorAll("[data-design-rotation]").forEach(btn=>btn.classList.toggle("active",hasSelection && Number(btn.dataset.designRotation)===Number(part.rotation||0)));
+    for(const c of [els.designerX,els.designerY,els.designerScale,els.designerRotateBtn,els.designerCenterBtn,els.designerResetElementBtn]) if(c) c.disabled=!hasSelection;
+    if(hasSelection){
+      if(els.designerX){els.designerX.value=String(Math.round(part.x));els.designerXOut.textContent=`${Math.round(part.x)}%`;}
+      if(els.designerY){els.designerY.value=String(Math.round(part.y));els.designerYOut.textContent=`${Math.round(part.y)}%`;}
+      if(els.designerScale){els.designerScale.value=String(Math.round(part.scale));els.designerScaleOut.textContent=`${Math.round(part.scale)}%`;}
+      if(els.designerAngleOut) els.designerAngleOut.textContent=`${Number(part.rotation||0)}°`;
+    } else if(els.designerAngleOut) els.designerAngleOut.textContent="–";
+    if(els.designerInfo){
+      if(!enabled) els.designerInfo.innerHTML="<span>i</span><span>Designer ist deaktiviert.</span>";
+      else if(!hasSelection) els.designerInfo.innerHTML="<span>✓</span><span>Keine Auswahl · Vorschau kann ungestört kontrolliert werden.</span>";
+      else if(designerState.locked) els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · Positionen gesperrt.</span>`;
+      else if(designerElement==="qr") els.designerInfo.innerHTML="<span>i</span><span>QR ausgewählt · Rahmen entspricht der QR-Matrix.</span>";
+      else els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · Tippen wählt, Ziehen verschiebt.</span>`;
+    }
+    if(els.designerSelection) els.designerSelection.classList.toggle("hidden",!enabled || !hasSelection || activeRenderMode()!=="local");
+    if(els.designerResizeHandle) els.designerResizeHandle.classList.toggle("hidden",!enabled || !hasSelection || designerState.locked || activeRenderMode()!=="local");
     updateDesignerSelection();
+    updateQuietZoneUi();
   }
 
   function updateDesignerSelection(bounds=null) {
     if(!els.designerSelection) return;
-    const visible=designerState.enabled && activeRenderMode()==="local";
+    const part=currentDesignPart();
+    const visible=designerState.enabled && !!part && activeRenderMode()==="local";
     els.designerSelection.classList.toggle("hidden",!visible);
     if(els.designerResizeHandle) els.designerResizeHandle.classList.toggle("hidden",!visible || designerState.locked);
     if(!visible) return;
-
-    const part=currentDesignPart();
     let b=bounds || designerBounds[designerElement];
-    if(!b){
-      const c=els.labelCanvas;
-      const w=designerElement==="qr"?Math.min(84,70*part.scale/100):Math.min(90,50*part.scale/100);
-      const h=designerElement==="qr"?w*(c.width/c.height):Math.max(8,12*part.scale/100);
-      b={x:part.x-w/2,y:part.y-h/2,w,h};
-    }
+    if(!b) return;
     b=rotatedBounds(b,part.rotation);
-    els.designerSelection.style.left=`${b.x}%`;
-    els.designerSelection.style.top=`${b.y}%`;
-    els.designerSelection.style.width=`${b.w}%`;
-    els.designerSelection.style.height=`${b.h}%`;
+    els.designerSelection.style.left=`${b.x}%`; els.designerSelection.style.top=`${b.y}%`;
+    els.designerSelection.style.width=`${b.w}%`; els.designerSelection.style.height=`${b.h}%`;
     if(els.designerSelectionLabel) els.designerSelectionLabel.textContent=designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption";
-    if(els.designerResizeHandle){
-      els.designerResizeHandle.style.left=`${Math.max(0,Math.min(100,b.x+b.w))}%`;
-      els.designerResizeHandle.style.top=`${Math.max(0,Math.min(100,b.y+b.h))}%`;
-    }
+    if(els.designerResizeHandle){els.designerResizeHandle.style.left=`${b.x+b.w}%`;els.designerResizeHandle.style.top=`${b.y+b.h}%`;}
   }
 
   function setDesignerPart(next,{persist=true}={}) {
     const part=currentDesignPart();
+    if(!part || !designerElement) return;
     if(next.x!==undefined) part.x=Math.max(0,Math.min(100,Number(next.x)));
     if(next.y!==undefined) part.y=Math.max(0,Math.min(100,Number(next.y)));
     if(next.scale!==undefined) part.scale=Math.max(40,Math.min(160,Number(next.scale)));
@@ -388,7 +391,10 @@
   function rotatedBounds(b,rotation=0) {
     if(!b) return null;
     const r=((Number(rotation)||0)%360+360)%360;
-    return (r===90 || r===270) ? {x:b.x,y:b.y,w:b.h,h:b.w} : {...b};
+    if(r!==90 && r!==270) return {...b};
+    const cx=b.x+b.w/2, cy=b.y+b.h/2;
+    const w=b.h, h=b.w;
+    return {x:cx-w/2,y:cy-h/2,w,h};
   }
 
   function clampDesignerPartToCanvas(key) {
@@ -397,21 +403,22 @@
     if(!d || !b) return;
     b=rotatedBounds(b,d.rotation);
     const halfW=Math.min(50,b.w/2), halfH=Math.min(50,b.h/2);
-    d.x=Math.max(halfW,Math.min(100-halfW,d.x));
-    d.y=Math.max(halfH,Math.min(100-halfH,d.y));
+    d.x=Math.max(DESIGN_EDGE_MARGIN+halfW,Math.min(100-DESIGN_EDGE_MARGIN-halfW,d.x));
+    d.y=Math.max(DESIGN_EDGE_MARGIN+halfH,Math.min(100-DESIGN_EDGE_MARGIN-halfH,d.y));
   }
 
-  function setDesignerHit(el,b,show=true) {
+  function setDesignerHit(el,b,show=true,rotation=0) {
     if(!el) return;
     el.classList.toggle("hidden",!show || !designerState.enabled || activeRenderMode()!=="local");
     if(!show) return;
-    el.style.left=`${b.x}%`; el.style.top=`${b.y}%`; el.style.width=`${b.w}%`; el.style.height=`${b.h}%`;
+    const rb=rotatedBounds(b,rotation);
+    el.style.left=`${rb.x}%`; el.style.top=`${rb.y}%`; el.style.width=`${rb.w}%`; el.style.height=`${rb.h}%`;
   }
   function updateDesignerHitTargets(c,total,caption,subcaption,m) {
     const q=designerState.qr, qw=total/c.width*100, qh=total/c.height*100;
-    const qb={x:q.x-qw/2,y:q.y-qh/2,w:qw,h:qh}; setDesignerBound("qr",qb); setDesignerHit(els.designerHitQr,qb);
-    if(caption){ const d=designerState.caption, fs=m.mainFs*d.scale/100, w=Math.min(90,Math.max(18,caption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); const b={x:d.x-w/2,y:d.y-h/2,w,h}; setDesignerBound("caption",b); setDesignerHit(els.designerHitCaption,b); } else { setDesignerBound("caption",null); setDesignerHit(els.designerHitCaption,{},false); }
-    if(subcaption){ const d=designerState.subcaption, fs=m.subFs*d.scale/100, w=Math.min(90,Math.max(18,subcaption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); const b={x:d.x-w/2,y:d.y-h/2,w,h}; setDesignerBound("subcaption",b); setDesignerHit(els.designerHitSubcaption,b); } else { setDesignerBound("subcaption",null); setDesignerHit(els.designerHitSubcaption,{},false); }
+    const qb={x:q.x-qw/2,y:q.y-qh/2,w:qw,h:qh}; setDesignerBound("qr",qb); setDesignerHit(els.designerHitQr,qb,true,q.rotation);
+    if(caption){ const d=designerState.caption, fs=m.mainFs*d.scale/100, w=Math.min(90,Math.max(18,caption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); const b={x:d.x-w/2,y:d.y-h/2,w,h}; setDesignerBound("caption",b); setDesignerHit(els.designerHitCaption,b,true,d.rotation); } else { setDesignerBound("caption",null); setDesignerHit(els.designerHitCaption,{},false); }
+    if(subcaption){ const d=designerState.subcaption, fs=m.subFs*d.scale/100, w=Math.min(90,Math.max(18,subcaption.length*fs*.55/c.width*100)), h=Math.max(8,fs*1.5/c.height*100); const b={x:d.x-w/2,y:d.y-h/2,w,h}; setDesignerBound("subcaption",b); setDesignerHit(els.designerHitSubcaption,b,true,d.rotation); } else { setDesignerBound("subcaption",null); setDesignerHit(els.designerHitSubcaption,{},false); }
   }
 
   function drawDesignerLocalLabel(ctx,c,text,caption,subcaption) {
@@ -1736,7 +1743,7 @@
   async function init() {
     ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","subcaption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","quietZone","quietZoneOut","quietZoneInfo","quietZoneBlock","paramQuietZone","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
-     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue","designerEnabled","designerControls","designerEditBtn","designerLockBtn","designerRotateAllBtn","designerRotateBtn","designerAngleOut","designerResizeHandle","designerSelectionLabel","designerHitQr","designerHitCaption","designerHitSubcaption","designerX","designerXOut","designerY","designerYOut","designerScale","designerScaleOut","designerCenterBtn","designerResetElementBtn","designerResetAllBtn","designerInfo","designerSelection",
+     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue","designerEnabled","designerControls","designerEditBtn","designerLockBtn","designerDeselectBtn","designerRotateAllBtn","designerRotateBtn","designerAngleOut","designerResizeHandle","designerSelectionLabel","designerHitQr","designerHitCaption","designerHitSubcaption","designerX","designerXOut","designerY","designerYOut","designerScale","designerScaleOut","designerCenterBtn","designerResetElementBtn","designerResetAllBtn","designerInfo","designerSelection",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     await restoreAccordionStates();
@@ -1791,10 +1798,13 @@
       updateDesignerUi(); await saveDesignerState(); render(true);
     });
     document.querySelectorAll("[data-design-element]").forEach(btn=>btn.addEventListener("click",()=>{
-      designerElement=btn.dataset.designElement || "qr";
+      const next=btn.dataset.designElement || "qr";
+      designerElement = designerElement===next ? null : next;
       updateDesignerUi();
     }));
+    els.designerDeselectBtn?.addEventListener("click",()=>{designerElement=null;updateDesignerUi();});
     const applyDesignerSliders=()=>{
+      if(!designerElement) return;
       setDesignerPart({
         x:Number(els.designerX.value),
         y:Number(els.designerY.value),
@@ -1803,8 +1813,9 @@
     };
     [els.designerX,els.designerY,els.designerScale].forEach(control=>control?.addEventListener("input",applyDesignerSliders));
     [els.designerX,els.designerY,els.designerScale].forEach(control=>control?.addEventListener("change",()=>void saveDesignerState()));
-    els.designerCenterBtn?.addEventListener("click",()=>setDesignerPart({x:50}));
+    els.designerCenterBtn?.addEventListener("click",()=>{if(designerElement)setDesignerPart({x:50});});
     els.designerResetElementBtn?.addEventListener("click",()=>{
+      if(!designerElement) return;
       designerState[designerElement]={...DESIGN_DEFAULTS[designerElement]};
       updateDesignerUi(); render(true); void saveDesignerState();
     });
@@ -1816,7 +1827,7 @@
 
     els.designerEditBtn?.addEventListener("click",()=>{ designerState.locked=false; updateDesignerUi(); void saveDesignerState(); });
     els.designerLockBtn?.addEventListener("click",()=>{ designerState.locked=true; updateDesignerUi(); void saveDesignerState(); });
-    els.designerRotateBtn?.addEventListener("click",()=>setDesignerPart({rotation:((Number(currentDesignPart().rotation)||0)+90)%360}));
+    els.designerRotateBtn?.addEventListener("click",()=>{const d=currentDesignPart();if(d)setDesignerPart({rotation:((Number(d.rotation)||0)+90)%360});});
         document.querySelectorAll("[data-design-rotation]").forEach(btn=>btn.addEventListener("click",()=>setDesignerPart({rotation:Number(btn.dataset.designRotation)||0})));
     els.designerRotateAllBtn?.addEventListener("click",()=>{
       for(const key of ["qr","caption","subcaption"]){
@@ -1851,10 +1862,16 @@
     els.designerResizeHandle?.addEventListener("pointerup",finishResize);
     els.designerResizeHandle?.addEventListener("pointercancel",finishResize);
 
+    els.previewStage?.addEventListener("pointerdown",ev=>{
+      if(!designerState.enabled || activeRenderMode()!=="local") return;
+      if(ev.target?.closest?.("[data-hit-element]") || ev.target===els.designerResizeHandle) return;
+      designerElement=null; updateDesignerUi();
+    });
     document.querySelectorAll("[data-hit-element]").forEach(hit=>{
       hit.addEventListener("pointerdown",ev=>{
         if(!designerState.enabled || activeRenderMode()!=="local") return;
         designerElement=hit.dataset.hitElement||"qr";
+        ev.stopPropagation();
         const details=els.designerControls?.closest("details"); if(details) details.open=true;
         updateDesignerUi();
         if(designerState.locked){ ev.preventDefault(); return; }

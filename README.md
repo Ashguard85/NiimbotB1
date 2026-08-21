@@ -1,27 +1,31 @@
-# QR Label v42
-## v42 – Bedienung des Designers verfeinert
+# QR Label v43
+## v43 – Auswahl nach Rotation korrigiert
+
+Rotierte Auswahl- und Touchboxen werden jetzt um denselben Mittelpunkt wie das Element berechnet. 90°/270° tauschen Breite und Höhe ohne Versatz. Ein konsistenter 2,5-%-Innenrand verhindert unbeabsichtigtes Abschneiden. Die Auswahl lässt sich per „Auswahl aufheben“, erneutem Klick auf den aktiven Elementbutton oder Tap auf freie Vorschaufläche entfernen; danach verschwinden Rahmen und Resize-Handle.
+
+## v43 – Bedienung des Designers verfeinert
 
 Canvas-Auswahl und Elementbuttons sind jetzt gekoppelt. Der sichtbare Auswahlrahmen trägt den Elementnamen und ein touchfreundlicher Resize-Handle erlaubt grobes Skalieren direkt am Label; X/Y/Größe bleiben als präzise Alternative erhalten. Der Haupt-Drehbutton dreht 90°, exakte Winkel liegen unter „Exakten Winkel wählen“. Die Gesamtdrehung begrenzt Elemente wieder auf die Label-Fläche, ohne sie automatisch zu skalieren.
 
 Bei aktivem manuellen Designer wird der QR-Ruheraum sichtbar deaktiviert und erklärt. Die Haupt-Akkordeons merken sich lokal ihren Zustand; neue Installationen starten mit Texterfassung und Designer offen, Renderer und Drucker geschlossen.
 
-## v42 – direkter Designer
+## v43 – direkter Designer
 
 Texterfassung steht als erster einklappbarer Bereich ganz oben. Im Designer selektiert ein Tap QR, Caption oder Subcaption direkt auf der Vorschau; Drag verschiebt. Bearbeiten/Sperren schützt vor Fehlbedienung. Elemente können in 0/90/180/270° gedreht werden; „Gesamtes Design 90°“ dreht Positionen und Elemente gemeinsam. Der manuelle QR bleibt ohne automatische Quiet Zone und nutzt seine quadratische Fläche maximal.
 
 
-## v42 – Tablet-first Label Designer
+## v43 – Tablet-first Label Designer
 
-v42 ist der größere UI-Sprung: Die Vorschau steht jetzt im Mittelpunkt und der Label-Designer liegt **zwingend direkt darunter**. Inhalt, Renderer und Druckoptionen sind in einklappbare Bereiche gegliedert, damit die Oberfläche auf Tablets schlank bleibt.
+v43 ist der größere UI-Sprung: Die Vorschau steht jetzt im Mittelpunkt und der Label-Designer liegt **zwingend direkt darunter**. Inhalt, Renderer und Druckoptionen sind in einklappbare Bereiche gegliedert, damit die Oberfläche auf Tablets schlank bleibt.
 
 Wichtig: Sobald die manuelle Designer-Platzierung aktiv ist, zeichnet der lokale Renderer **keinen automatischen QR-Ruheraum**. Die QR-Box entspricht der tatsächlichen QR-Matrix. Abstand zu Etikettrand und Text bestimmt der Benutzer vollständig über Position und Größe. Außerhalb des manuellen Designers bleibt `quiet=` wie bisher wirksam.
 
 Alle bisherigen Eingaben bleiben erhalten: Schnell erfassen, Kamera-QR, Foto/Bild, Zwischenablage, QR-Ziel, automatische Jira-/Assets-Caption samt Prefix, Subcaption, Caption-Größe, Labelgröße, ECC, Offline/QuickChart, Druckerautomatik, PNG/PDF, Vorlagen und Return-Shortcut.
 
 
-## v42 – visueller Label-Designer
+## v43 – visueller Label-Designer
 
-v42 ergänzt einen lokalen Designer direkt in der Labelvorschau. Es gibt bewusst **noch kein Layout-Preset-System** und keinen `layout=`-URL-Parameter.
+v43 ergänzt einen lokalen Designer direkt in der Labelvorschau. Es gibt bewusst **noch kein Layout-Preset-System** und keinen `layout=`-URL-Parameter.
 
 - Designer pro Labelgröße aktivieren/deaktivieren
 - Element auswählen: **QR**, **Caption**, **Subcaption**
@@ -36,9 +40,9 @@ v42 ergänzt einen lokalen Designer direkt in der Labelvorschau. Es gibt bewusst
 Der Designer arbeitet ausschließlich mit **Offline (lokal)**. Beim Aktivieren wechselt die App deshalb automatisch auf den lokalen Renderer. QuickChart bleibt als separater, unveränderter Renderweg verfügbar.
 
 
-## v42 – Subcaption / zweite Textzeile
+## v43 – Subcaption / zweite Textzeile
 
-Zusätzlich zur bestehenden `caption` unterstützt v42 eine zweite, kleinere Zeile **`subcaption`**, z. B. für eine Raumbezeichnung.
+Zusätzlich zur bestehenden `caption` unterstützt v43 eine zweite, kleinere Zeile **`subcaption`**, z. B. für eine Raumbezeichnung.
 
 Beispiel:
 
@@ -53,11 +57,11 @@ Beispiel:
 - B1/B1 Pro/M2-H sowie die v32-Ruheraum-Steuerung bleiben erhalten.
 
 
-## v42 – steuerbarer QR-Ruheraum im lokalen Renderer
+## v43 – steuerbarer QR-Ruheraum im lokalen Renderer
 
 Der Offline-Renderer hatte bisher fest **4 QR-Module Weißraum pro Seite** reserviert. Das ist standardkonform, kann auf flachen Labels wie 50×30 mm aber dazu führen, dass die eigentliche schwarze QR-Matrix deutlich kleiner wird als erwartet.
 
-v42 macht diesen Wert sichtbar und steuerbar:
+v43 macht diesen Wert sichtbar und steuerbar:
 
 - **QR-Ruheraum: 0–8 Module**
 - Standard: **4 Module** (QR-Standard / beste Scan-Reserve)
