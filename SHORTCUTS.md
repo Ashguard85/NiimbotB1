@@ -105,7 +105,7 @@ https://USER.github.io/REPO/#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObjec
 v22 erkennt den verbundenen Primary-Tab und übergibt die URL automatisch dorthin.
 
 
-## Auto-Druck in v33
+## Auto-Druck in v34
 
 Wenn **Nach URL-Aufruf automatisch drucken** in der App aktiviert ist, reicht z. B.:
 
@@ -116,7 +116,7 @@ https://Ashguard85.github.io/NiimbotB1/#url=https%3A%2F%2FmeineURL.com%2Fsecure%
 Die App übernimmt die Nutzlast, versucht den bekannten Drucker automatisch wiederzuverbinden und druckt nach erfolgreicher Verbindung. Alternativ erzwingt `&autoprint=1` den Auto-Druck nur für den jeweiligen Aufruf, unabhängig von der gespeicherten Option.
 
 
-## v33: Rückkehr nach dem Druck
+## v34: Rückkehr nach dem Druck
 
 Zusätzlicher Parameter:
 
@@ -131,7 +131,7 @@ Beispiel der inneren GitHub-Pages-URL:
 Für Bluefy muss diese komplette innere URL anschließend als Wert von `bluefy://open?url=` nochmals URL-codiert werden.
 
 
-## v33 – Rückkehrvarianten
+## v34 – Rückkehrvarianten
 
 Direkt: `&return=https%3A%2F%2Fwww.google.com%2F`
 
@@ -140,11 +140,11 @@ Kurzbefehl: `&return=shortcut&shortcut=Zur%C3%BCck`
 Direktes Shortcuts-Scheme bleibt ebenfalls unterstützt. Für Bluefy wird die komplette innere URL nochmals als Wert von `bluefy://open?url=` URL-codiert.
 
 
-## v33 – M2-H
+## v34 – M2-H
 Shortcut- und Bluefy-URLs ändern sich nicht. Nach dem Verbinden erkennt die App B1/B1 Pro/M2-H automatisch und wählt die passende DPI/Geometrie.
 
 
-## v33 – lokaler QR-Ruheraum
+## v34 – lokaler QR-Ruheraum
 
 Nur für **Offline (lokal)**:
 
@@ -159,7 +159,7 @@ Beispiel:
 `#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345&label=50x30&quiet=2`
 
 
-## v33 – Subcaption
+## v34 – Subcaption
 
 Parameter:
 
@@ -170,3 +170,8 @@ Komplettes Beispiel:
 `#url=https%3A%2F%2FmeineURL.com%2Fsecure%2FShowObject.jspa%3Fid%3D12345&caption=IAM-12345&subcaption=Raum%202.14&quiet=2`
 
 Die Subcaption ist unabhängig von QuickChart und wird im QuickChart-Modus lokal unter das fertige QuickChart-Bild gesetzt.
+
+
+## v34 – Designer
+
+Der visuelle Designer ist lokal pro Labelgröße gespeichert. URL-Parameter für Designerpositionen oder benannte Layouts gibt es in v34 bewusst noch nicht. URL-Inhalte (`url`, `caption`, `subcaption`, `quiet` usw.) werden weiterhin in das lokal gespeicherte Designer-Layout eingesetzt.

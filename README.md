@@ -1,8 +1,25 @@
-# QR Label v33
+# QR Label v34
 
-## v33 – Subcaption / zweite Textzeile
+## v34 – visueller Label-Designer
 
-Zusätzlich zur bestehenden `caption` unterstützt v33 eine zweite, kleinere Zeile **`subcaption`**, z. B. für eine Raumbezeichnung.
+v34 ergänzt einen lokalen Designer direkt in der Labelvorschau. Es gibt bewusst **noch kein Layout-Preset-System** und keinen `layout=`-URL-Parameter.
+
+- Designer pro Labelgröße aktivieren/deaktivieren
+- Element auswählen: **QR**, **Caption**, **Subcaption**
+- Element direkt in der Vorschau mit Touch/Maus verschieben
+- X/Y zusätzlich über Slider fein einstellen
+- Größe jedes Elements separat skalieren
+- Element zentrieren oder einzeln zurücksetzen
+- kompletten Designer für die aktuelle Labelgröße zurücksetzen
+- Einstellungen werden lokal pro Labelgröße gespeichert
+- Druck, PNG und PDF verwenden genau das Designer-Canvas
+
+Der Designer arbeitet ausschließlich mit **Offline (lokal)**. Beim Aktivieren wechselt die App deshalb automatisch auf den lokalen Renderer. QuickChart bleibt als separater, unveränderter Renderweg verfügbar.
+
+
+## v34 – Subcaption / zweite Textzeile
+
+Zusätzlich zur bestehenden `caption` unterstützt v34 eine zweite, kleinere Zeile **`subcaption`**, z. B. für eine Raumbezeichnung.
 
 Beispiel:
 
@@ -17,11 +34,11 @@ Beispiel:
 - B1/B1 Pro/M2-H sowie die v32-Ruheraum-Steuerung bleiben erhalten.
 
 
-## v33 – steuerbarer QR-Ruheraum im lokalen Renderer
+## v34 – steuerbarer QR-Ruheraum im lokalen Renderer
 
 Der Offline-Renderer hatte bisher fest **4 QR-Module Weißraum pro Seite** reserviert. Das ist standardkonform, kann auf flachen Labels wie 50×30 mm aber dazu führen, dass die eigentliche schwarze QR-Matrix deutlich kleiner wird als erwartet.
 
-v33 macht diesen Wert sichtbar und steuerbar:
+v34 macht diesen Wert sichtbar und steuerbar:
 
 - **QR-Ruheraum: 0–8 Module**
 - Standard: **4 Module** (QR-Standard / beste Scan-Reserve)

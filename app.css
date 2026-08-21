@@ -22,3 +22,15 @@ body.ble-choosing::after{content:"Bluetooth-Gerät auswählen …";display:block
 .field-block.is-disabled { opacity: .58; }
 .field-block.is-disabled input { cursor: not-allowed; }
 .inline-status.warn { border-color: rgba(183,121,31,.35); background: rgba(183,121,31,.08); }
+
+.designer-block .switch-line{display:flex;align-items:center;gap:.45rem;font-size:.85rem}
+.designer-controls{display:grid;gap:.75rem;margin-top:.7rem}
+.designer-controls.is-disabled{opacity:.52;pointer-events:none}
+.designer-elements,.designer-actions{display:flex;gap:.45rem;flex-wrap:wrap}
+.designer-elements .active{outline:2px solid currentColor;outline-offset:1px}
+.designer-sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.preview-stage{position:relative;touch-action:pan-y}
+.designer-selection{position:absolute;border:2px dashed currentColor;border-radius:6px;pointer-events:none;box-sizing:border-box;z-index:5;transform:none}
+.designer-selection.hidden{display:none}
+body:has(#designerEnabled:checked) .preview-stage{touch-action:none;cursor:move}
+@media(max-width:700px){.designer-sliders{grid-template-columns:1fr}.designer-actions .btn{flex:1 1 auto}}

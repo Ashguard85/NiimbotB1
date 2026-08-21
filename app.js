@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const APP_VERSION = "33";
+  const APP_VERSION = "34";
   let returnAfterPrintUrl = "";
   const $ = (id) => document.getElementById(id);
   const els = {};
@@ -27,6 +27,19 @@
   let autoCaptionValue = "";
   let nativeQrDetector = undefined;
   let bleChooserUiActive = false;
+  let designerElement = "qr";
+  let designerDrag = null;
+  const DESIGN_DEFAULTS = Object.freeze({
+    qr: Object.freeze({x:50,y:42,scale:100}),
+    caption: Object.freeze({x:50,y:82,scale:100}),
+    subcaption: Object.freeze({x:50,y:91,scale:100})
+  });
+  let designerState = {
+    enabled:false,
+    qr:{...DESIGN_DEFAULTS.qr},
+    caption:{...DESIGN_DEFAULTS.caption},
+    subcaption:{...DESIGN_DEFAULTS.subcaption}
+  };
 
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
 
@@ -234,7 +247,160 @@
     } finally { setTimeout(()=>URL.revokeObjectURL(objectUrl),1000); }
   }
 
+  function designStorageKey(sizeKey=els.labelSize?.value || "40x40") {
+    return `labelDesigner:${sizeKey}`;
+  }
+
+  function cloneDesignDefaults() {
+    return {
+      enabled:false,
+      qr:{...DESIGN_DEFAULTS.qr},
+      caption:{...DESIGN_DEFAULTS.caption},
+      subcaption:{...DESIGN_DEFAULTS.subcaption}
+    };
+  }
+
+  function normalizeDesignPart(value, fallback) {
+    const v=value && typeof value==="object" ? value : {};
+    return {
+      x:Math.max(0,Math.min(100,Number(v.x ?? fallback.x))),
+      y:Math.max(0,Math.min(100,Number(v.y ?? fallback.y))),
+      scale:Math.max(40,Math.min(160,Number(v.scale ?? fallback.scale)))
+    };
+  }
+
+  async function loadDesignerState(sizeKey=els.labelSize?.value || "40x40") {
+    const saved=await LocalStore.getSetting(designStorageKey(sizeKey),null);
+    const base=cloneDesignDefaults();
+    if(saved && typeof saved==="object"){
+      base.enabled=!!saved.enabled;
+      base.qr=normalizeDesignPart(saved.qr,DESIGN_DEFAULTS.qr);
+      base.caption=normalizeDesignPart(saved.caption,DESIGN_DEFAULTS.caption);
+      base.subcaption=normalizeDesignPart(saved.subcaption,DESIGN_DEFAULTS.subcaption);
+    }
+    designerState=base;
+    if(els.designerEnabled) els.designerEnabled.checked=designerState.enabled;
+    updateDesignerUi();
+  }
+
+  async function saveDesignerState() {
+    await LocalStore.setSetting(designStorageKey(),{
+      enabled:!!designerState.enabled,
+      qr:{...designerState.qr},
+      caption:{...designerState.caption},
+      subcaption:{...designerState.subcaption}
+    });
+  }
+
+  function currentDesignPart() {
+    return designerState[designerElement] || designerState.qr;
+  }
+
+  function updateDesignerUi() {
+    if(!els.designerControls) return;
+    const enabled=!!designerState.enabled;
+    els.designerControls.classList.toggle("is-disabled",!enabled);
+    document.querySelectorAll("[data-design-element]").forEach(btn=>btn.classList.toggle("active",btn.dataset.designElement===designerElement));
+    const part=currentDesignPart();
+    if(els.designerX){ els.designerX.value=String(Math.round(part.x)); els.designerXOut.textContent=`${Math.round(part.x)}%`; }
+    if(els.designerY){ els.designerY.value=String(Math.round(part.y)); els.designerYOut.textContent=`${Math.round(part.y)}%`; }
+    if(els.designerScale){ els.designerScale.value=String(Math.round(part.scale)); els.designerScaleOut.textContent=`${Math.round(part.scale)}%`; }
+    if(els.designerInfo) els.designerInfo.innerHTML=`<span>i</span><span>${designerElement==="qr"?"QR":designerElement==="caption"?"Caption":"Subcaption"} ausgewählt · ${enabled?"direkt in der Vorschau ziehen.":"Designer ist deaktiviert."}</span>`;
+    if(els.designerSelection) els.designerSelection.classList.toggle("hidden",!enabled || activeRenderMode()!=="local");
+    updateDesignerSelection();
+  }
+
+  function updateDesignerSelection(bounds=null) {
+    if(!els.designerSelection || !designerState.enabled || activeRenderMode()!=="local") return;
+    const c=els.labelCanvas;
+    if(!c || !c.width || !c.height) return;
+    let b=bounds;
+    if(!b){
+      const p=currentDesignPart();
+      const w = designerElement==="qr" ? Math.min(84,70*p.scale/100) : Math.min(90,50*p.scale/100);
+      const h = designerElement==="qr" ? w*(c.width/c.height) : Math.max(8,12*p.scale/100);
+      b={x:p.x-w/2,y:p.y-h/2,w,h};
+    }
+    els.designerSelection.style.left=`${b.x}%`;
+    els.designerSelection.style.top=`${b.y}%`;
+    els.designerSelection.style.width=`${b.w}%`;
+    els.designerSelection.style.height=`${b.h}%`;
+  }
+
+  function setDesignerPart(next,{persist=true}={}) {
+    const part=currentDesignPart();
+    if(next.x!==undefined) part.x=Math.max(0,Math.min(100,Number(next.x)));
+    if(next.y!==undefined) part.y=Math.max(0,Math.min(100,Number(next.y)));
+    if(next.scale!==undefined) part.scale=Math.max(40,Math.min(160,Number(next.scale)));
+    updateDesignerUi();
+    render(true);
+    if(persist) void saveDesignerState();
+  }
+
+  function designerEnabledForLocal() {
+    return !!designerState.enabled && activeRenderMode()==="local";
+  }
+
+  function qrMatrixMetrics(c,n,caption,subcaption) {
+    const margin=Math.max(6,Math.round(c.width*.025));
+    let mainFs=caption?captionFontPx(c,caption):0;
+    let subFs=subcaption?subcaptionFontPx(c,mainFs):0;
+    const mainGap=caption?Math.max(1,Math.round(mainFs*.06)):0;
+    const between=caption&&subcaption?Math.max(1,Math.round(subFs*.08)):0;
+    const subGap=!caption&&subcaption?Math.max(1,Math.round(subFs*.08)):0;
+    const mainLineH=caption?Math.ceil(mainFs*1.08):0;
+    const subLineH=subcaption?Math.ceil(subFs*1.08):0;
+    const textBlockH=mainLineH+subLineH+mainGap+between+subGap;
+    const maxQr=Math.max(1,Math.min(c.width-margin*2,c.height-margin*2-textBlockH));
+    const q=quietZoneModules();
+    return {margin,mainFs,subFs,maxQr,q};
+  }
+
+  function drawDesignerLocalLabel(ctx,c,text,caption,subcaption) {
+    if(!window.qrcode) throw new Error("QR-Bibliothek nicht geladen.");
+    const qr=qrcode(0,els.ecc.value);
+    qr.addData(text,"Byte"); qr.make();
+    const n=qr.getModuleCount();
+    const m=qrMatrixMetrics(c,n,caption,subcaption);
+    const qrDesign=designerState.qr;
+    const scale=Math.max(.4,Math.min(1.6,qrDesign.scale/100));
+    const maxTotal=Math.max(1,Math.floor(m.maxQr*scale));
+    const modulePx=Math.max(1,Math.floor(maxTotal/(n+m.q*2)));
+    const qrPx=n*modulePx, quiet=m.q*modulePx, total=qrPx+quiet*2;
+
+    ctx.imageSmoothingEnabled=false;
+    ctx.fillStyle="#fff"; ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle="#000";
+
+    const centerX=c.width*qrDesign.x/100;
+    const centerY=c.height*qrDesign.y/100;
+    const left=Math.round(centerX-total/2);
+    const top=Math.round(centerY-total/2);
+    const x0=left+quiet, y0=top+quiet;
+    for(let r=0;r<n;r++) for(let col=0;col<n;col++){
+      if(qr.isDark(r,col)) ctx.fillRect(x0+col*modulePx,y0+r*modulePx,modulePx,modulePx);
+    }
+
+    if(caption){
+      const d=designerState.caption;
+      let fs=fitTextFont(ctx,caption,m.mainFs*d.scale/100,8,c.width-m.margin*2,700);
+      ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#000";
+      ctx.fillText(caption,c.width*d.x/100,c.height*d.y/100);
+    }
+    if(subcaption){
+      const d=designerState.subcaption;
+      let fs=fitTextFont(ctx,subcaption,m.subFs*d.scale/100,8,c.width-m.margin*2,600);
+      ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillStyle="#000";
+      ctx.fillText(subcaption,c.width*d.x/100,c.height*d.y/100);
+    }
+
+    const qrBounds={x:left/c.width*100,y:top/c.height*100,w:total/c.width*100,h:total/c.height*100};
+    if(designerElement==="qr") updateDesignerSelection(qrBounds);
+    return n;
+  }
+
   function drawLocalLabel(ctx, c, text, caption, subcaption) {
+    if (designerEnabledForLocal()) return drawDesignerLocalLabel(ctx,c,text,caption,subcaption);
     if (!window.qrcode) throw new Error("QR-Bibliothek nicht geladen.");
     const qr = qrcode(0, els.ecc.value);
     qr.addData(text, "Byte");
@@ -340,6 +506,8 @@
       }
     }
     updateQuietZoneUi();
+    if(els.designerSelection) els.designerSelection.classList.toggle("hidden",!designerState.enabled || activeRenderMode()!=="local");
+    if(els.designerInfo && designerState.enabled && activeRenderMode()!=="local") els.designerInfo.innerHTML="<span>!</span><span>Designer ist nur im Offline-Renderer aktiv.</span>";
   }
 
   function updateParamPanel(renderLabel) {
@@ -422,6 +590,7 @@
           ctx.putImageData(img,0,0);
         }
         els.printBtn.disabled = !connected;
+        if (designerState.enabled) updateDesignerSelection();
       } catch (e) {
         if (generation !== renderGeneration) return;
         if (activeRenderMode() === "quickchart") {
@@ -775,7 +944,7 @@
     activePrinter=B1Printer.setSize(key);
     if (persist) LocalStore.setSetting("labelSize",key);
     updateGeometryUi({resetOffset});
-    render(true);
+    void loadDesignerState(key).then(()=>render(true));
     const g=printerGeometry().size;
     if (!g.validated) status(`${g.w_mm}×${g.h_mm} mm ist für ${printerGeometry().name} abgeleitet. Bei Bedarf Vertikal-Offset nach Testdruck feinjustieren.`,"warn");
   }
@@ -1495,7 +1664,7 @@
   async function init() {
     ["toast","statusBox","bleBridgeStatus","printerDot","connectBtn","connectAllBtn","connectLabel","printBtn","autoReconnectKnown","autoPrintOnOpen","disconnectAfterPrint","returnAfterPrint","returnShortcutName","knownPrinterInfo","sourceInput","qrText","caption","subcaption","labelSize","ecc","previewStage","previewViewport","labelCanvas","labelInfo","renderState","previewMm","pixelBadge",
      "density","densityOut","copies","offsetY","captionScale","captionScaleOut","quietZone","quietZoneOut","quietZoneInfo","quietZoneBlock","paramQuietZone","renderMode","renderModeInfo","invert","savePresetBtn","presetList","historyList","refreshItemsBtn","shareBtn","savePngBtn","savePdfBtn",
-     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue",
+     "modeBadge","onlineBadge","settingsBtn","importStatus","showParamsBtn","scanQrBtn","scanImageBtn","pasteLinkBtn","scanImageInput","captureStatus","scanModal","scanVideo","scanCanvas","scanStatus","scanCloseBtn","scanCancelBtn","scanPhotoFallbackBtn","autoAssetCaption","jiraPrefix","paramsDetails","paramText","paramCaption","paramSubcaption","paramCaptionSize","paramSize","paramEcc","paramRenderMode","captionStatus","gridOverlay","safeOverlay","gridBtn","safeBtn","invertBtn","zoomOutBtn","zoomInBtn","zoomValue","designerEnabled","designerControls","designerX","designerXOut","designerY","designerYOut","designerScale","designerScaleOut","designerCenterBtn","designerResetElementBtn","designerResetAllBtn","designerInfo","designerSelection",
      "serverSettings","backendUrl","cfClientId","cfClientSecret","testServerBtn","saveServerBtn","clearServerBtn",
      "exportBtn","importFile","updateStatus","updateBtn","appVersion","onlineState"].forEach(id=>els[id]=$(id));
     setupHandoffReceiver();
@@ -1525,6 +1694,7 @@
       await LocalStore.setSetting("offsetY",B1Printer.LABEL_PRESETS["40x40"].sizes[4096].offset_y_px ?? 0);
     }
     setLabelSize(validLabelSizes.has(savedSize)?savedSize:"40x40",{persist:false,resetOffset:false});
+    await loadDesignerState(els.labelSize.value);
     els.offsetY.value=await LocalStore.getSetting("offsetY",printerGeometry().size.offset_y_px ?? 0);
     updateCaptionScaleUi(); updateModeUi(); updateQuietZoneUi(); updateGeometryUi(); updateParamPanel(); setPreviewZoom(1);
     await loadProvider();
@@ -1537,6 +1707,67 @@
     if (els.knownPrinterInfo) els.knownPrinterInfo.textContent = pref ? `Bekannter Drucker: ${pref.name || "NIIMBOT"}` : "Noch kein bekannter Drucker gespeichert";
 
     ["qrText","caption","subcaption","ecc","invert","captionScale","quietZone"].forEach(id=>els[id].addEventListener("input",()=>{ dirty=true; updateCaptionScaleUi(); updateQuietZoneUi(); render(); }));
+    els.designerEnabled?.addEventListener("change",async()=>{
+      designerState.enabled=els.designerEnabled.checked;
+      if(designerState.enabled && els.renderMode.value!=="local"){
+        els.renderMode.value="local";
+        await LocalStore.setSetting("renderMode","local");
+        updateModeUi();
+        toast("Designer verwendet Offline-Rendering");
+      }
+      updateDesignerUi(); await saveDesignerState(); render(true);
+    });
+    document.querySelectorAll("[data-design-element]").forEach(btn=>btn.addEventListener("click",()=>{
+      designerElement=btn.dataset.designElement || "qr";
+      updateDesignerUi();
+    }));
+    const applyDesignerSliders=()=>{
+      setDesignerPart({
+        x:Number(els.designerX.value),
+        y:Number(els.designerY.value),
+        scale:Number(els.designerScale.value)
+      },{persist:false});
+    };
+    [els.designerX,els.designerY,els.designerScale].forEach(control=>control?.addEventListener("input",applyDesignerSliders));
+    [els.designerX,els.designerY,els.designerScale].forEach(control=>control?.addEventListener("change",()=>void saveDesignerState()));
+    els.designerCenterBtn?.addEventListener("click",()=>setDesignerPart({x:50}));
+    els.designerResetElementBtn?.addEventListener("click",()=>{
+      designerState[designerElement]={...DESIGN_DEFAULTS[designerElement]};
+      updateDesignerUi(); render(true); void saveDesignerState();
+    });
+    els.designerResetAllBtn?.addEventListener("click",()=>{
+      const enabled=designerState.enabled;
+      designerState=cloneDesignDefaults(); designerState.enabled=enabled;
+      updateDesignerUi(); render(true); void saveDesignerState();
+    });
+
+    const designerPointerPosition=(ev)=>{
+      const rect=els.previewStage.getBoundingClientRect();
+      return {
+        x:Math.max(0,Math.min(100,(ev.clientX-rect.left)/rect.width*100)),
+        y:Math.max(0,Math.min(100,(ev.clientY-rect.top)/rect.height*100))
+      };
+    };
+    els.previewStage?.addEventListener("pointerdown",ev=>{
+      if(!designerState.enabled || activeRenderMode()!=="local") return;
+      designerDrag={pointerId:ev.pointerId};
+      try{ els.previewStage.setPointerCapture(ev.pointerId); }catch(_){}
+      const p=designerPointerPosition(ev); setDesignerPart(p,{persist:false});
+      ev.preventDefault();
+    });
+    els.previewStage?.addEventListener("pointermove",ev=>{
+      if(!designerDrag || designerDrag.pointerId!==ev.pointerId) return;
+      const p=designerPointerPosition(ev); setDesignerPart(p,{persist:false});
+      ev.preventDefault();
+    });
+    const finishDesignerDrag=ev=>{
+      if(!designerDrag || designerDrag.pointerId!==ev.pointerId) return;
+      designerDrag=null; void saveDesignerState();
+      try{ els.previewStage.releasePointerCapture(ev.pointerId); }catch(_){}
+    };
+    els.previewStage?.addEventListener("pointerup",finishDesignerDrag);
+    els.previewStage?.addEventListener("pointercancel",finishDesignerDrag);
+
     els.qrText.addEventListener("input",()=>{ LocalStore.setSetting("draftQr",els.qrText.value); setImportStatus(false); });
     els.subcaption.addEventListener("input",()=>LocalStore.setSetting("draftSubcaption",els.subcaption.value));
     const processSource = () => {
