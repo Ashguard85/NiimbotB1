@@ -1,9 +1,12 @@
-# Release v41
+# Release v42
 
-- Texterfassung ganz oben, einklappbar.
-- Tap selektiert Elemente direkt in der Vorschau; Drag verschiebt.
-- Bearbeiten/Sperren.
-- Rotation 0/90/180/270° pro Element.
-- Gesamtes Design 90° drehen.
-- Manueller QR ohne automatische Quiet Zone und maximal in seiner quadratischen Fläche.
-- Version/Cache v41.
+- Canvas-Auswahl und Elementbuttons synchron.
+- Auswahlrahmen mit Elementname.
+- 44px Resize-Handle direkt am Element.
+- X/Y/Größe bleiben als präzise Alternative.
+- Hauptrotation als ↻ 90°; exakte Winkel unter Erweitert.
+- Gesamtdrehung begrenzt Elemente auf die Label-Fläche.
+- Quiet-Zone-Steuerung bei aktivem Designer deaktiviert/erklärt.
+- Accordion-Zustände lokal gespeichert.
+- Größere Touch-Ziele.
+- Version/Cache v42.
