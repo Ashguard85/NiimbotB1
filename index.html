@@ -8,15 +8,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="QR Label">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self'; img-src 'self' data: blob: https://quickchart.io; connect-src 'self' https://quickchart.io https:; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; worker-src 'self' blob:;">
-  <title>QR Label – NIIMBOT B1</title>
-  <link rel="manifest" href="./manifest.webmanifest?v=28">
+  <title>QR Label – NIIMBOT</title>
+  <link rel="manifest" href="./manifest.webmanifest?v=33">
   <link rel="icon" href="./icons/favicon.png">
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="./app.css?v=28">
+  <link rel="stylesheet" href="./app.css?v=33">
 </head>
 <body>
 <header class="topbar">
-  <div class="brand"><div class="eyebrow">NIIMBOT B1</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v28</span></div></div>
+  <div class="brand"><div class="eyebrow">NIIMBOT</div><div class="title-row"><h1>QR Label</h1><span id="appVersion" class="version">v33</span></div></div>
   <div class="top-actions"><span id="onlineBadge" class="top-pill">Online</span><button id="modeBadge" class="top-pill button-pill" type="button">Lokal</button><button id="settingsBtn" class="icon-btn" type="button" aria-label="Einstellungen">⚙︎</button></div>
 </header>
 
@@ -59,9 +59,22 @@
       </div>
 
       <div class="field-block">
+        <label for="subcaption" class="label-title">Subcaption</label>
+        <p class="hint">Zweite, kleinere Textzeile unter der Caption, z. B. eine Raumbezeichnung. URL-Parameter: <code>subcaption=</code>.</p>
+        <input id="subcaption" type="text" maxlength="160" placeholder="z. B. Raum 2.14">
+      </div>
+
+      <div class="field-block">
         <div class="label-line"><label for="captionScale" class="label-title">Caption-Größe</label><output id="captionScaleOut" class="value-chip">Auto</output></div>
         <p class="hint">Bei QuickChart wird <code>captionFontSize / size</code> übernommen.</p>
         <input id="captionScale" class="range" type="range" min="0" max="25" step="0.5" value="0">
+      </div>
+
+      <div class="field-block" id="quietZoneBlock">
+        <div class="label-line"><label for="quietZone" class="label-title">QR-Ruheraum</label><output id="quietZoneOut" class="value-chip">4 Module</output></div>
+        <p class="hint">Weißraum direkt um die QR-Matrix. <strong>4 Module</strong> entsprechen dem QR-Standard. Kleinere Werte vergrößern den QR, können aber die Scan-Zuverlässigkeit reduzieren. Nur im Offline-Renderer.</p>
+        <input id="quietZone" class="range" type="range" min="0" max="8" step="1" value="4">
+        <div id="quietZoneInfo" class="inline-status neutral"><span>✓</span><span>Standard-Ruheraum · 4 Module</span></div>
       </div>
 
       <div class="field-block">
@@ -95,14 +108,16 @@
       </div>
 
       <div class="print-actions">
-        <button id="connectBtn" class="btn secondary" type="button"><span class="dot" id="printerDot"></span><span id="connectLabel">B1 verbinden</span></button>
+        <button id="connectBtn" class="btn secondary" type="button"><span class="dot" id="printerDot"></span><span id="connectLabel">NIIMBOT verbinden</span></button>
         <button id="connectAllBtn" class="btn ghost compact" type="button">Alle Bluetooth-Geräte anzeigen</button>
         <button id="printBtn" class="btn primary wide" type="button" disabled>Drucken</button>
       </div>
       <div class="printer-options" aria-label="Bluetooth-Automatik">
         <label class="toggle-option"><input id="autoReconnectKnown" type="checkbox" checked><span><strong>Bekannten Drucker automatisch verbinden</strong><small>Neue Tabs versuchen zuerst <code>navigator.bluetooth.getDevices()</code>.</small></span></label>
         <label class="toggle-option"><input id="autoPrintOnOpen" type="checkbox"><span><strong>Nach URL-Aufruf automatisch drucken</strong><small>Nur bei übergebenem <code>#url</code>, <code>#qr</code> oder QuickChart-Inhalt. Startet nach erfolgreicher Auto-Verbindung.</small></span></label>
-        <label class="toggle-option"><input id="disconnectAfterPrint" type="checkbox" checked><span><strong>Nach erfolgreichem Druck trennen</strong><small>Gibt den B1 für den nächsten Tab frei.</small></span></label>
+        <label class="toggle-option"><input id="disconnectAfterPrint" type="checkbox" checked><span><strong>Nach erfolgreichem Druck trennen</strong><small>Gibt den NIIMBOT für den nächsten Tab frei.</small></span></label>
+        <label class="toggle-option"><input id="returnAfterPrint" type="checkbox"><span><strong>Nach dem Druck Rückkehr ausführen</strong><small>Verwendet <code>return=</code>. Unterstützt direkte URLs/App-Schemes und Apple-Kurzbefehle.</small></span></label>
+        <div class="field-row"><label for="returnShortcutName">Standard-Kurzbefehl für Rückkehr</label><input id="returnShortcutName" type="text" placeholder="z. B. Zurück"><small>Optional. Mit <code>return=shortcut</code> wird dieser Kurzbefehl gestartet.</small></div>
         <div id="knownPrinterInfo" class="known-printer-info">Noch kein bekannter Drucker gespeichert</div>
       </div>
       <div class="export-actions"><button id="savePngBtn" class="btn ghost" type="button">PNG teilen / sichern</button><button id="savePdfBtn" class="btn ghost" type="button">PDF teilen / sichern</button><button id="savePresetBtn" class="btn ghost" type="button">Vorlage speichern</button><button id="shareBtn" class="btn ghost" type="button">QR-Ziel teilen</button></div>
@@ -123,14 +138,14 @@
       <div id="captionStatus" class="inline-status neutral"><span>✓</span><span>Vorschau bereit.</span></div>
       <div class="meta-line"><span id="labelInfo">B1 · 40 × 40 mm · 320 × 320 px</span><span id="renderState">bereit</span></div>
 
-      <details id="paramsDetails" class="info-details" open><summary>Parameter (aus deinem Link übernommen)</summary><div class="param-table" id="paramTable"><div><span>QR-Text (text)</span><strong id="paramText">–</strong></div><div><span>Caption (caption)</span><strong id="paramCaption">–</strong></div><div><span>Caption Font Size</span><strong id="paramCaptionSize">–</strong></div><div><span>QR Size (size)</span><strong id="paramSize">–</strong></div><div><span>Fehlerkorrektur</span><strong id="paramEcc">M</strong></div><div><span>Render-Modus</span><strong id="paramRenderMode">Offline lokal</strong></div></div></details>
+      <details id="paramsDetails" class="info-details" open><summary>Parameter (aus deinem Link übernommen)</summary><div class="param-table" id="paramTable"><div><span>QR-Text (text)</span><strong id="paramText">–</strong></div><div><span>Caption (caption)</span><strong id="paramCaption">–</strong></div><div><span>Subcaption</span><strong id="paramSubcaption">–</strong></div><div><span>Caption Font Size</span><strong id="paramCaptionSize">–</strong></div><div><span>QR Size (size)</span><strong id="paramSize">–</strong></div><div><span>Fehlerkorrektur</span><strong id="paramEcc">M</strong></div><div><span>Render-Modus</span><strong id="paramRenderMode">Offline lokal</strong></div><div><span>QR-Ruheraum</span><strong id="paramQuietZone">4 Module</strong></div></div></details>
       <details class="info-details"><summary>So funktioniert es</summary><div class="help-copy"><p><strong>Offline:</strong> schnell, privat und ohne Internet. QR und Caption werden lokal gerendert.</p><p><strong>QuickChart API:</strong> verwendet QuickCharts eigenes Bild und damit dessen Caption-Layout. Benötigt Internet.</p><p>Drucken, PNG und PDF verwenden immer genau die aktuell gerenderte Vorschau.</p></div></details>
     </article>
   </section>
 
   <section id="settingsSection" class="below-grid">
     <article class="panel"><details><summary>Vorlagen & Verlauf</summary><div class="stack"><div class="subhead"><strong>Vorlagen</strong><button id="refreshItemsBtn" class="link-btn" type="button">Aktualisieren</button></div><div id="presetList" class="list empty">Noch keine Vorlagen.</div><div class="subhead history-head"><strong>Letzte Drucke</strong></div><div id="historyList" class="list empty">Noch keine Drucke.</div></div></details></article>
-    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v28 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
+    <article class="panel"><details><summary>Setup, Daten & Update</summary><div class="stack"><div class="mode-picker"><div><strong>Betriebsmodus</strong><p>Der Druck läuft direkt vom Browser zum Drucker.</p></div><label><input type="radio" name="mode" value="local" checked> Lokal</label><label><input type="radio" name="mode" value="server"> Server</label></div><div id="serverSettings" class="server-settings hidden"><label class="field"><span>Backend URL</span><input id="backendUrl" type="url" placeholder="https://api.example.com"></label><label class="field"><span>Cloudflare Client ID</span><input id="cfClientId" type="text" autocomplete="off"></label><label class="field"><span>Cloudflare Client Secret</span><input id="cfClientSecret" type="password" autocomplete="new-password"></label><div class="row"><button id="testServerBtn" class="btn ghost" type="button">Verbindung prüfen</button><button id="saveServerBtn" class="btn ghost" type="button">Server speichern</button><button id="clearServerBtn" class="btn danger-lite" type="button">Zugang löschen</button></div></div><div class="data-actions"><button id="exportBtn" class="btn ghost" type="button">Backup exportieren</button><label class="btn ghost file-btn">Backup importieren<input id="importFile" type="file" accept="application/json,.json"></label></div><div class="update-box"><div><strong>App-Version</strong><div id="updateStatus">v33 · wird geprüft</div></div><button id="updateBtn" class="btn ghost hidden" type="button">Jetzt aktualisieren</button></div></div></details></article>
   </section>
 </main>
 <div id="scanModal" class="scanner-modal hidden" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
@@ -143,6 +158,6 @@
   </div>
 </div>
 
-<footer><span>QR Label v28</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=28" defer></script><script src="./providers.js?v=28" defer></script><script src="./printer.js?v=28" defer></script><script src="./app.js?v=28" defer></script>
+<footer><span>QR Label v33</span><span id="onlineState">online</span></footer><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js" defer></script><script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js" defer></script><script src="https://unpkg.com/niimbot-web-bluetooth@2.4.0/src/niimbot.js" defer></script><script src="./storage.js?v=33" defer></script><script src="./providers.js?v=33" defer></script><script src="./printer.js?v=33" defer></script><script src="./app.js?v=33" defer></script>
 </body></html>
